@@ -30,22 +30,40 @@ fun MessageReviewScreen(
     onSyncChanged: (rowId: Long, synced: Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    LazyColumn(
+    Column(
         modifier = modifier
             .fillMaxSize()
             .padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        item {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("确认短信", style = MaterialTheme.typography.headlineSmall)
-                Text(
-                    "共 ${state.drafts.size} 条，可逐条修改。",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            }
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text("确认短信", style = MaterialTheme.typography.headlineSmall)
+            Text(
+                "共 ${state.drafts.size} 条，可逐条修改。",
+                style = MaterialTheme.typography.bodyMedium,
+            )
         }
-        itemsIndexed(state.drafts, key = { _, draft -> draft.rowId }) { index, draft ->
+        MessageReviewList(
+            drafts = state.drafts,
+            onEdit = onEdit,
+            onSyncChanged = onSyncChanged,
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
+
+@Composable
+fun MessageReviewList(
+    drafts: List<MessageDraft>,
+    onEdit: (rowId: Long, body: String) -> Unit,
+    onSyncChanged: (rowId: Long, synced: Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    LazyColumn(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        itemsIndexed(drafts, key = { _, draft -> draft.rowId }) { index, draft ->
             MessageReviewItem(
                 ordinal = index + 1,
                 draft = draft,
@@ -75,7 +93,7 @@ fun MessageReviewItem(
             modifier = Modifier
                 .fillMaxWidth()
                 .testTag("message-body-${draft.rowId}"),
-            minLines = 3,
+            minLines = 2,
         )
         Row(
             modifier = Modifier.fillMaxWidth(),

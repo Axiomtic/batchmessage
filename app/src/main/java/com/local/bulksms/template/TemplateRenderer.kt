@@ -16,7 +16,7 @@ class TemplateRenderer(
         phoneColumnIndex,
     )
 
-    private val token = Regex("\\{([^{}]+)}")
+    private val token = Regex("\\{([^{}]+)\\}")
 
     fun validate(template: String, columns: List<String>): Set<String> =
         token.findAll(template)
