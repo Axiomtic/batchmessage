@@ -49,6 +49,22 @@ class XlsxImporterTest {
     }
 
     @Test
+    fun readsStrictWorksheetRelationshipAfterSkippingChartAndDialogSheets() {
+        val bytes = xlsxFixture(
+            sheets = listOf(
+                nonWorksheetSheet("Chart", "chartsheet"),
+                nonWorksheetSheet("Dialog", "dialogsheet"),
+                strictVisibleSheet("Data", listOf(listOf(inline("strict selected")))),
+            ),
+        )
+
+        assertEquals(
+            listOf(listOf("strict selected")),
+            XlsxImporter().import(bytes.inputStream()).rows,
+        )
+    }
+
+    @Test
     fun readsBooleanDatesAndFormulaCachedValues() {
         val bytes = xlsxFixture(
             sheets = listOf(
@@ -299,6 +315,14 @@ class XlsxImporterTest {
     private fun visibleSheet(name: String, rows: List<List<CellSpec>>): SheetSpec =
         SheetSpec(name, sheetXml(rows), hidden = false)
 
+    private fun strictVisibleSheet(name: String, rows: List<List<CellSpec>>): SheetSpec =
+        SheetSpec(
+            name = name,
+            xml = sheetXml(rows),
+            hidden = false,
+            relationshipType = STRICT_WORKSHEET_RELATIONSHIP_TYPE,
+        )
+
     private fun nonWorksheetSheet(name: String, relationshipType: String): SheetSpec =
         SheetSpec(
             name = name,
@@ -455,6 +479,8 @@ class XlsxImporterTest {
 
 private const val WORKSHEET_RELATIONSHIP_TYPE =
     "http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet"
+private const val STRICT_WORKSHEET_RELATIONSHIP_TYPE =
+    "http://purl.oclc.org/ooxml/officeDocument/relationships/worksheet"
 
 private fun escapeXml(value: String): String =
     value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")

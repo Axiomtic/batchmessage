@@ -30,7 +30,7 @@ class XlsxImporter : TableImporter {
         val workbook = parseWorkbook(requiredEntry(entries, WORKBOOK_PATH))
         val relationships = parseRelationships(requiredEntry(entries, WORKBOOK_RELATIONSHIPS_PATH))
         val sheet = workbook.sheets.firstOrNull {
-            !it.hidden && relationships[it.relationshipId]?.type == WORKSHEET_RELATIONSHIP_TYPE
+            !it.hidden && relationships[it.relationshipId]?.type in WORKSHEET_RELATIONSHIP_TYPES
         }
             ?: error("工作簿没有可见工作表")
         val sheetPath = resolveSheetPath(relationships.getValue(sheet.relationshipId).target)
@@ -427,6 +427,12 @@ class XlsxImporter : TableImporter {
         const val MILLIS_PER_DAY = 86_400_000L
         const val WORKSHEET_RELATIONSHIP_TYPE =
             "http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet"
+        const val STRICT_WORKSHEET_RELATIONSHIP_TYPE =
+            "http://purl.oclc.org/ooxml/officeDocument/relationships/worksheet"
+        val WORKSHEET_RELATIONSHIP_TYPES = setOf(
+            WORKSHEET_RELATIONSHIP_TYPE,
+            STRICT_WORKSHEET_RELATIONSHIP_TYPE,
+        )
         val HIDDEN_STATES = setOf("hidden", "veryhidden")
         val DRIVE_PATH = Regex("^[A-Za-z]:.*")
         const val RELATIONSHIPS_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
