@@ -1,0 +1,64 @@
+package com.local.bulksms.importdata
+
+import com.local.bulksms.model.DynamicColumn
+import com.local.bulksms.model.DynamicRow
+import com.local.bulksms.model.ImportedTable
+import com.local.bulksms.model.RawTable
+
+class ImportLimitExceeded(
+    val actualRows: Int,
+    val maxRows: Int = HeaderDetector.MAX_DATA_ROWS,
+) : IllegalArgumentException("数据行数 $actualRows 超过上限 $maxRows")
+
+object HeaderDetector {
+    const val MAX_DATA_ROWS = 100
+
+    fun materialize(raw: RawTable, firstRowIsHeader: Boolean): ImportedTable {
+        val width = raw.rows.maxOfOrNull { it.size } ?: 0
+        val dataRows = if (firstRowIsHeader) raw.rows.drop(1) else raw.rows
+        if (dataRows.size > MAX_DATA_ROWS) {
+            throw ImportLimitExceeded(dataRows.size)
+        }
+
+        val header = if (firstRowIsHeader) raw.rows.firstOrNull().orEmpty() else emptyList()
+        val names = if (firstRowIsHeader) {
+            uniqueColumnNames(header, width)
+        } else {
+            (0 until width).map { index -> "列${index + 1}" }
+        }
+        val columns = names.mapIndexed { index, name -> DynamicColumn(id = index, name = name) }
+        val rows = dataRows.mapIndexed { index, cells ->
+            DynamicRow(id = index.toLong(), cells = cells.padTo(width))
+        }
+
+        return ImportedTable(
+            columns = columns,
+            rows = rows,
+            firstRowIsHeader = firstRowIsHeader,
+        )
+    }
+
+    private fun uniqueColumnNames(header: List<String>, width: Int): List<String> {
+        val used = mutableSetOf<String>()
+        return (0 until width).map { index ->
+            val suppliedName = header.getOrNull(index).orEmpty().trim()
+            val baseName = suppliedName.ifBlank { "列${index + 1}" }
+            uniqueName(baseName, used)
+        }
+    }
+
+    private fun uniqueName(baseName: String, used: MutableSet<String>): String {
+        if (used.add(baseName)) return baseName
+
+        var suffix = 2
+        while (!used.add("${baseName}_$suffix")) {
+            suffix++
+        }
+        return "${baseName}_$suffix"
+    }
+
+    private fun List<String>.padTo(width: Int): List<String> {
+        if (size >= width) return toList()
+        return this + List(width - size) { "" }
+    }
+}
