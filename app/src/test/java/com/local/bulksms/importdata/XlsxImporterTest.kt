@@ -34,6 +34,21 @@ class XlsxImporterTest {
     }
 
     @Test
+    fun skipsVisibleNonWorksheetRelationshipBeforeVisibleWorksheet() {
+        val bytes = xlsxFixture(
+            sheets = listOf(
+                nonWorksheetSheet("Chart", "chartsheet"),
+                visibleSheet("Data", listOf(listOf(inline("selected")))),
+            ),
+        )
+
+        assertEquals(
+            listOf(listOf("selected")),
+            XlsxImporter().import(bytes.inputStream()).rows,
+        )
+    }
+
+    @Test
     fun readsBooleanDatesAndFormulaCachedValues() {
         val bytes = xlsxFixture(
             sheets = listOf(
@@ -65,6 +80,50 @@ class XlsxImporterTest {
 
         assertEquals(listOf("2024-01-01", "TRUE", "2", ""), raw.rows.single())
         assertTrue(raw.warnings.any { it.contains("D1") && it.contains("缓存") })
+    }
+
+    @Test
+    fun readsDateUsingThe1904WorkbookDateSystem() {
+        val bytes = xlsxFixture(
+            sheets = listOf(
+                visibleSheetXml(
+                    "Data",
+                    "<sheetData><row r=\"1\"><c r=\"A1\" s=\"1\"><v>0</v></c></row></sheetData>",
+                ),
+            ),
+            date1904 = true,
+            styles = """
+                <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+                  <cellXfs count="2"><xf numFmtId="0"/><xf numFmtId="14"/></cellXfs>
+                </styleSheet>
+            """.trimIndent(),
+        )
+
+        assertEquals(listOf("1904-01-01"), XlsxImporter().import(bytes.inputStream()).rows.single())
+    }
+
+    @Test
+    fun recognizesCommonBuiltinDateStyleIds() {
+        val bytes = xlsxFixture(
+            sheets = listOf(
+                visibleSheetXml(
+                    "Data",
+                    "<sheetData><row r=\"1\"><c r=\"A1\" s=\"1\"><v>1</v></c><c r=\"B1\" s=\"2\"><v>1</v></c></row></sheetData>",
+                ),
+            ),
+            styles = """
+                <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+                  <cellXfs count="3">
+                    <xf numFmtId="0"/><xf numFmtId="27"/><xf numFmtId="50"/>
+                  </cellXfs>
+                </styleSheet>
+            """.trimIndent(),
+        )
+
+        assertEquals(
+            listOf("1900-01-01", "1900-01-01"),
+            XlsxImporter().import(bytes.inputStream()).rows.single(),
+        )
     }
 
     @Test
@@ -130,6 +189,87 @@ class XlsxImporterTest {
     }
 
     @Test
+    fun rejectsRelationshipTargetTraversalAndAbsolutePath() {
+        listOf("../outside.xml", "/outside.xml").forEach { target ->
+            val bytes = zipOf(
+                "xl/workbook.xml" to minimalWorkbookXml(),
+                "xl/_rels/workbook.xml.rels" to minimalRelationshipsXml(target),
+            )
+
+            assertThrows(IllegalArgumentException::class.java) {
+                XlsxImporter().import(bytes.inputStream())
+            }
+        }
+    }
+
+    @Test
+    fun rejectsCumulativeUncompressedZipDataOverEightMib() {
+        val chunk = ByteArray(4 * 1024 * 1024 + 1) { 'x'.code.toByte() }
+        val bytes = zipOfBytes(
+            "first.bin" to chunk,
+            "second.bin" to chunk,
+        )
+
+        assertThrows(IllegalArgumentException::class.java) {
+            XlsxImporter().import(bytes.inputStream())
+        }
+    }
+
+    @Test
+    fun rejectsExternalEntityDeclarations() {
+        val workbookXml = """
+            <!DOCTYPE workbook [<!ENTITY xxe SYSTEM "file:///tmp/xlsx-secret">]>
+            <workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+                xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+              <sheets><sheet name="&xxe;" sheetId="1" r:id="rId1"/></sheets>
+            </workbook>
+        """.trimIndent()
+        val bytes = xlsxFixture(
+            sheets = listOf(visibleSheet("Data", listOf(listOf(inline("value")))),),
+            workbookXmlOverride = workbookXml,
+        )
+
+        assertThrows(IllegalArgumentException::class.java) {
+            XlsxImporter().import(bytes.inputStream())
+        }
+    }
+
+    @Test
+    fun rejectsInternalEntityExpansionDeclarations() {
+        val workbookXml = """
+            <!DOCTYPE workbook [<!ENTITY boom "expanded">]>
+            <workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+                xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+              <sheets><sheet name="&boom;" sheetId="1" r:id="rId1"/></sheets>
+            </workbook>
+        """.trimIndent()
+        val bytes = xlsxFixture(
+            sheets = listOf(visibleSheet("Data", listOf(listOf(inline("value")))),),
+            workbookXmlOverride = workbookXml,
+        )
+
+        assertThrows(IllegalArgumentException::class.java) {
+            XlsxImporter().import(bytes.inputStream())
+        }
+    }
+
+    @Test
+    fun rejectsColumnReferenceBeyondExcelMaximum() {
+        val bytes = xlsxFixture(
+            sheets = listOf(
+                visibleSheetXml(
+                    "Data",
+                    "<sheetData><row r=\"1\"><c r=\"XFE1\" t=\"inlineStr\"><is><t>too wide</t></is></c></row></sheetData>",
+                ),
+            ),
+        )
+
+        assertThrows(IllegalArgumentException::class.java) {
+            XlsxImporter().import(bytes.inputStream())
+        }
+    }
+
+    @Test
     fun rejectsWorkbookWithoutVisibleSheetOrRows() {
         val hiddenOnly = xlsxFixture(
             sheets = listOf(hiddenSheet("Hidden", emptyList())),
@@ -150,6 +290,7 @@ class XlsxImporterTest {
         val name: String,
         val xml: String,
         val hidden: Boolean,
+        val relationshipType: String = WORKSHEET_RELATIONSHIP_TYPE,
     )
 
     private fun hiddenSheet(name: String, rows: List<List<CellSpec>>): SheetSpec =
@@ -157,6 +298,14 @@ class XlsxImporterTest {
 
     private fun visibleSheet(name: String, rows: List<List<CellSpec>>): SheetSpec =
         SheetSpec(name, sheetXml(rows), hidden = false)
+
+    private fun nonWorksheetSheet(name: String, relationshipType: String): SheetSpec =
+        SheetSpec(
+            name = name,
+            xml = "<chartsheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"/>",
+            hidden = false,
+            relationshipType = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/$relationshipType",
+        )
 
     private fun visibleSheetXml(name: String, sheetData: String): SheetSpec =
         SheetSpec(
@@ -186,6 +335,8 @@ class XlsxImporterTest {
     private fun xlsxFixture(
         sheets: List<SheetSpec>,
         styles: String = defaultStyles(),
+        date1904: Boolean = false,
+        workbookXmlOverride: String? = null,
     ): ByteArray {
         val sharedValues = mutableListOf<String>()
         val transformedSheets = sheets.map { sheet ->
@@ -202,7 +353,7 @@ class XlsxImporterTest {
         }
         val entries = linkedMapOf(
             "[Content_Types].xml" to "<Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\"/>",
-            "xl/workbook.xml" to workbookXml(transformedSheets),
+            "xl/workbook.xml" to (workbookXmlOverride ?: workbookXml(transformedSheets, date1904)),
             "xl/_rels/workbook.xml.rels" to relationshipsXml(transformedSheets),
             "xl/styles.xml" to styles,
         )
@@ -215,7 +366,7 @@ class XlsxImporterTest {
         return zipOf(*entries.entries.map { it.key to it.value }.toTypedArray())
     }
 
-    private fun workbookXml(sheets: List<SheetSpec>): String {
+    private fun workbookXml(sheets: List<SheetSpec>, date1904: Boolean): String {
         val sheetXml = sheets.mapIndexed { index, sheet ->
             val state = if (sheet.hidden) " state=\"hidden\"" else ""
             "<sheet name=\"${sheet.name}\" sheetId=\"${index + 1}\" r:id=\"rId${index + 1}\"$state/>"
@@ -223,14 +374,15 @@ class XlsxImporterTest {
         return """
             <workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
                 xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+              ${if (date1904) "<workbookPr date1904=\"1\"/>" else ""}
               <sheets>$sheetXml</sheets>
             </workbook>
         """.trimIndent()
     }
 
     private fun relationshipsXml(sheets: List<SheetSpec>): String {
-        val relationships = sheets.mapIndexed { index, _ ->
-            "<Relationship Id=\"rId${index + 1}\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet\" Target=\"worksheets/sheet${index + 1}.xml\"/>"
+        val relationships = sheets.mapIndexed { index, sheet ->
+            "<Relationship Id=\"rId${index + 1}\" Type=\"${sheet.relationshipType}\" Target=\"worksheets/sheet${index + 1}.xml\"/>"
         }.joinToString("")
         return """
             <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">$relationships</Relationships>
@@ -240,8 +392,8 @@ class XlsxImporterTest {
     private fun minimalWorkbookXml(): String =
         "<workbook xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\"><sheets><sheet name=\"Data\" sheetId=\"1\" r:id=\"rId1\"/></sheets></workbook>"
 
-    private fun minimalRelationshipsXml(): String =
-        "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Id=\"rId1\" Target=\"worksheets/sheet1.xml\"/></Relationships>"
+    private fun minimalRelationshipsXml(target: String = "worksheets/sheet1.xml"): String =
+        "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Id=\"rId1\" Type=\"$WORKSHEET_RELATIONSHIP_TYPE\" Target=\"$target\"/></Relationships>"
 
     private fun sharedStringsXml(values: List<String>): String =
         "<sst xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\">${values.joinToString("") { "<si><t>${escapeXml(it)}</t></si>" }}</sst>"
@@ -250,11 +402,15 @@ class XlsxImporterTest {
         "<styleSheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><cellXfs count=\"1\"><xf numFmtId=\"0\"/></cellXfs></styleSheet>"
 
     private fun zipOf(vararg entries: Pair<String, String>): ByteArray {
+        return zipOfBytes(*entries.map { (name, content) -> name to content.toByteArray() }.toTypedArray())
+    }
+
+    private fun zipOfBytes(vararg entries: Pair<String, ByteArray>): ByteArray {
         val output = ByteArrayOutputStream()
         ZipOutputStream(output).use { zip ->
             entries.forEach { (name, content) ->
                 zip.putNextEntry(ZipEntry(name))
-                zip.write(content.toByteArray())
+                zip.write(content)
                 zip.closeEntry()
             }
         }
@@ -296,6 +452,9 @@ class XlsxImporterTest {
     }
 
 }
+
+private const val WORKSHEET_RELATIONSHIP_TYPE =
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet"
 
 private fun escapeXml(value: String): String =
     value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")

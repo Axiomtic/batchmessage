@@ -28,10 +28,12 @@ class XlsxImporter : TableImporter {
     override fun import(input: InputStream): RawTable {
         val entries = unzipEntries(input)
         val workbook = parseWorkbook(requiredEntry(entries, WORKBOOK_PATH))
-        val sheet = workbook.firstOrNull { !it.hidden }
+        val relationships = parseRelationships(requiredEntry(entries, WORKBOOK_RELATIONSHIPS_PATH))
+        val sheet = workbook.sheets.firstOrNull {
+            !it.hidden && relationships[it.relationshipId]?.type == WORKSHEET_RELATIONSHIP_TYPE
+        }
             ?: error("工作簿没有可见工作表")
-        val relationships = requiredEntry(entries, WORKBOOK_RELATIONSHIPS_PATH)
-        val sheetPath = resolveSheetPath(relationships, sheet.relationshipId)
+        val sheetPath = resolveSheetPath(relationships.getValue(sheet.relationshipId).target)
         val sheetXml = entries[sheetPath]
             ?: throw IllegalArgumentException("工作表关系指向不存在的条目: $sheetPath")
         val sharedStrings = entries[SHARED_STRINGS_PATH]
@@ -40,7 +42,7 @@ class XlsxImporter : TableImporter {
         val dateStyles = entries[STYLES_PATH]
             ?.let(::parseDateStyleIndexes)
             .orEmpty()
-        return parseSheet(sheetXml, sharedStrings, dateStyles)
+        return parseSheet(sheetXml, sharedStrings, dateStyles, workbook.date1904)
     }
 
     private fun unzipEntries(input: InputStream): Map<String, ByteArray> {
@@ -99,9 +101,9 @@ class XlsxImporter : TableImporter {
         return name
     }
 
-    private fun parseWorkbook(bytes: ByteArray): List<WorkbookSheet> {
+    private fun parseWorkbook(bytes: ByteArray): WorkbookInfo {
         val document = parseXml(bytes, WORKBOOK_PATH)
-        return descendantElements(document, "sheet").map { sheet ->
+        val sheets = descendantElements(document, "sheet").map { sheet ->
             val relationshipId = sheet.attribute("r:id")
                 .ifBlank { sheet.attribute("id") }
                 .ifBlank { throw IllegalArgumentException("工作表缺少关系 ID") }
@@ -110,15 +112,28 @@ class XlsxImporter : TableImporter {
                 hidden = sheet.attribute("state").lowercase(Locale.US) in HIDDEN_STATES,
             )
         }
+        val date1904 = descendantElements(document, "workbookPr").firstOrNull()
+            ?.attribute("date1904")
+            ?.lowercase(Locale.US) in setOf("1", "true")
+        return WorkbookInfo(sheets = sheets, date1904 = date1904)
     }
 
-    private fun resolveSheetPath(relationshipsBytes: ByteArray, relationshipId: String): String {
-        val document = parseXml(relationshipsBytes, WORKBOOK_RELATIONSHIPS_PATH)
-        val relationship = descendantElements(document, "Relationship")
-            .firstOrNull { it.attribute("Id") == relationshipId }
-            ?: throw IllegalArgumentException("找不到工作表关系: $relationshipId")
-        val target = relationship.attribute("Target")
-            .ifBlank { throw IllegalArgumentException("工作表关系缺少目标路径: $relationshipId") }
+    private fun parseRelationships(bytes: ByteArray): Map<String, WorkbookRelationship> {
+        val document = parseXml(bytes, WORKBOOK_RELATIONSHIPS_PATH)
+        return descendantElements(document, "Relationship").associate { relationship ->
+            val id = relationship.attribute("Id")
+                .ifBlank { throw IllegalArgumentException("工作表关系缺少 ID") }
+            val type = relationship.attribute("Type")
+            val target = relationship.attribute("Target")
+                .ifBlank { throw IllegalArgumentException("工作表关系缺少目标路径: $id") }
+            id to WorkbookRelationship(type = type, target = target)
+        }
+    }
+
+    private fun resolveSheetPath(target: String): String {
+        if (target.startsWith('/') || target.startsWith('\\') || DRIVE_PATH.matches(target)) {
+            throw IllegalArgumentException("工作表关系路径必须是相对路径: $target")
+        }
         if (target.indexOf('\\') >= 0 || target.split('/').any { it == ".." || it == "." }) {
             throw IllegalArgumentException("工作表关系路径包含非法分段: $target")
         }
@@ -155,6 +170,7 @@ class XlsxImporter : TableImporter {
         bytes: ByteArray,
         sharedStrings: List<String>,
         dateStyles: Map<Int, DateStyle>,
+        date1904: Boolean,
     ): RawTable {
         val document = parseXml(bytes, "工作表")
         val rowElements = descendantElements(document, "row")
@@ -174,11 +190,14 @@ class XlsxImporter : TableImporter {
             for (cell in childElements(rowElement, "c")) {
                 val reference = cell.attribute("r")
                 val columnIndex = columnIndex(reference) ?: run {
+                    if (implicitColumn >= MAX_COLUMN_COUNT) {
+                        throw IllegalArgumentException("单元格列超出 Excel 限制: $reference")
+                    }
                     while (cells.containsKey(implicitColumn)) implicitColumn++
                     implicitColumn
                 }
                 implicitColumn = maxOf(implicitColumn + 1, columnIndex + 1)
-                cells[columnIndex] = parseCell(cell, sharedStrings, dateStyles, warnings)
+                cells[columnIndex] = parseCell(cell, sharedStrings, dateStyles, warnings, date1904)
             }
             val width = cells.keys.maxOrNull()?.plus(1) ?: 0
             rows += List(width) { index -> cells[index].orEmpty() }
@@ -199,6 +218,7 @@ class XlsxImporter : TableImporter {
         sharedStrings: List<String>,
         dateStyles: Map<Int, DateStyle>,
         warnings: MutableList<String>,
+        date1904: Boolean,
     ): String {
         val reference = cell.attribute("r").ifBlank { "未知单元格" }
         val type = cell.attribute("t")
@@ -233,7 +253,7 @@ class XlsxImporter : TableImporter {
         }
         val style = cell.attribute("s").toIntOrNull()?.let(dateStyles::get)
         if (style != null && trimmedValue.isNotBlank() && (type.isBlank() || type == "n" || formula)) {
-            formatExcelDate(trimmedValue, style.hasTime)?.let { return it }
+            formatExcelDate(trimmedValue, style.hasTime, date1904)?.let { return it }
         }
         return if (type.isBlank() || type == "n" || formula) trimmedValue else rawValue
     }
@@ -241,13 +261,14 @@ class XlsxImporter : TableImporter {
     private fun richTextValue(element: Element): String =
         descendantElements(element, "t").joinToString(separator = "") { it.textContent }
 
-    private fun formatExcelDate(serialText: String, hasTime: Boolean): String? {
+    private fun formatExcelDate(serialText: String, hasTime: Boolean, date1904: Boolean): String? {
         val serial = serialText.toDoubleOrNull() ?: return null
         if (!serial.isFinite()) return null
         return try {
             var milliseconds = Math.round(serial * MILLIS_PER_DAY)
-            if (serial >= 60.0) milliseconds -= MILLIS_PER_DAY
-            val date = Date(EXCEL_EPOCH_MILLIS + milliseconds)
+            if (!date1904 && serial >= 60.0) milliseconds -= MILLIS_PER_DAY
+            val epoch = if (date1904) EXCEL_1904_EPOCH_MILLIS else EXCEL_EPOCH_MILLIS
+            val date = Date(epoch + milliseconds)
             if (!hasTime) {
                 dateFormat("yyyy-MM-dd").format(date)
             } else {
@@ -263,17 +284,17 @@ class XlsxImporter : TableImporter {
 
     private fun parseXml(bytes: ByteArray, description: String): Document {
         try {
-            val factory = DocumentBuilderFactory.newInstance().apply {
-                isNamespaceAware = true
-                isExpandEntityReferences = false
-                setFeatureIfSupported("http://apache.org/xml/features/disallow-doctype-decl", true)
-                setFeatureIfSupported("http://xml.org/sax/features/external-general-entities", false)
-                setFeatureIfSupported("http://xml.org/sax/features/external-parameter-entities", false)
-                setFeatureIfSupported("http://apache.org/xml/features/nonvalidating/load-external-dtd", false)
-                setAttributeIfSupported("http://javax.xml.XMLConstants/property/accessExternalDTD", "")
-                setAttributeIfSupported("http://javax.xml.XMLConstants/property/accessExternalSchema", "")
-                isXIncludeAware = false
-            }
+            val factory = DocumentBuilderFactory.newInstance()
+            factory.isNamespaceAware = true
+            factory.isExpandEntityReferences = false
+            factory.setFeature(SECURE_PROCESSING_FEATURE, true)
+            factory.setFeature(DISALLOW_DOCTYPE_FEATURE, true)
+            factory.setFeature(EXTERNAL_GENERAL_ENTITIES_FEATURE, false)
+            factory.setFeature(EXTERNAL_PARAMETER_ENTITIES_FEATURE, false)
+            factory.setFeature(LOAD_EXTERNAL_DTD_FEATURE, false)
+            factory.setAttribute(ACCESS_EXTERNAL_DTD_PROPERTY, "")
+            factory.setAttribute(ACCESS_EXTERNAL_SCHEMA_PROPERTY, "")
+            factory.isXIncludeAware = false
             val builder = factory.newDocumentBuilder()
             builder.setEntityResolver(org.xml.sax.EntityResolver { _, _ ->
                 InputSource(StringReader(""))
@@ -281,23 +302,6 @@ class XlsxImporter : TableImporter {
             return builder.parse(ByteArrayInputStream(bytes))
         } catch (exception: Exception) {
             throw IllegalArgumentException("无法解析 $description", exception)
-        }
-    }
-
-    private fun DocumentBuilderFactory.setFeatureIfSupported(name: String, value: Boolean) {
-        try {
-            setFeature(name, value)
-        } catch (_: Exception) {
-            // Android XML implementations can omit optional parser features. The resolver and
-            // external-access attributes above still prevent external entity resolution.
-        }
-    }
-
-    private fun DocumentBuilderFactory.setAttributeIfSupported(name: String, value: String) {
-        try {
-            setAttribute(name, value)
-        } catch (_: Exception) {
-            // See setFeatureIfSupported.
         }
     }
 
@@ -345,7 +349,9 @@ class XlsxImporter : TableImporter {
         var index = 0L
         for (letter in letters) {
             index = index * 26 + (letter.uppercaseChar() - 'A' + 1)
-            if (index > Int.MAX_VALUE.toLong()) return null
+            if (index > MAX_COLUMN_COUNT) {
+                throw IllegalArgumentException("单元格列超出 Excel 限制: $reference")
+            }
         }
         return (index - 1).toInt()
     }
@@ -374,15 +380,34 @@ class XlsxImporter : TableImporter {
         20 -> "h:mm"
         21 -> "h:mm:ss"
         22 -> "m/d/yy h:mm"
+        27, 28, 29 -> "yyyy-mm-dd"
+        30 -> "m-d-yy"
+        31 -> "yyyy-mm-dd"
+        32 -> "h:mm"
+        33 -> "h:mm:ss"
+        34 -> "h:mm"
+        35 -> "h:mm:ss"
+        36 -> "yyyy-mm"
         45 -> "mm:ss"
         46 -> "[h]:mm:ss"
         47 -> "mmss.0"
+        50, 51, 52, 53, 54, 55, 56, 57, 58 -> "yyyy-mm-dd"
         else -> null
     }
 
     private data class WorkbookSheet(
         val relationshipId: String,
         val hidden: Boolean,
+    )
+
+    private data class WorkbookInfo(
+        val sheets: List<WorkbookSheet>,
+        val date1904: Boolean,
+    )
+
+    private data class WorkbookRelationship(
+        val type: String,
+        val target: String,
     )
 
     private data class DateStyle(val hasTime: Boolean)
@@ -396,15 +421,29 @@ class XlsxImporter : TableImporter {
         const val SHARED_STRINGS_PATH = "xl/sharedStrings.xml"
         const val STYLES_PATH = "xl/styles.xml"
         const val MAX_UNCOMPRESSED_BYTES = 8L * 1024L * 1024L
+        const val MAX_COLUMN_COUNT = 16_384
         const val MAX_RAW_ROWS = HeaderDetector.MAX_DATA_ROWS + 1
         const val BUFFER_SIZE = 8 * 1024
         const val MILLIS_PER_DAY = 86_400_000L
+        const val WORKSHEET_RELATIONSHIP_TYPE =
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet"
         val HIDDEN_STATES = setOf("hidden", "veryhidden")
         val DRIVE_PATH = Regex("^[A-Za-z]:.*")
         const val RELATIONSHIPS_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+        const val SECURE_PROCESSING_FEATURE = "http://javax.xml.XMLConstants/feature/secure-processing"
+        const val DISALLOW_DOCTYPE_FEATURE = "http://apache.org/xml/features/disallow-doctype-decl"
+        const val EXTERNAL_GENERAL_ENTITIES_FEATURE = "http://xml.org/sax/features/external-general-entities"
+        const val EXTERNAL_PARAMETER_ENTITIES_FEATURE = "http://xml.org/sax/features/external-parameter-entities"
+        const val LOAD_EXTERNAL_DTD_FEATURE = "http://apache.org/xml/features/nonvalidating/load-external-dtd"
+        const val ACCESS_EXTERNAL_DTD_PROPERTY = "http://javax.xml.XMLConstants/property/accessExternalDTD"
+        const val ACCESS_EXTERNAL_SCHEMA_PROPERTY = "http://javax.xml.XMLConstants/property/accessExternalSchema"
         val EXCEL_EPOCH_MILLIS = GregorianCalendar(TimeZone.getTimeZone("UTC")).apply {
             clear()
             set(1899, GregorianCalendar.DECEMBER, 31, 0, 0, 0)
+        }.timeInMillis
+        val EXCEL_1904_EPOCH_MILLIS = GregorianCalendar(TimeZone.getTimeZone("UTC")).apply {
+            clear()
+            set(1904, GregorianCalendar.JANUARY, 1, 0, 0, 0)
         }.timeInMillis
     }
 }
