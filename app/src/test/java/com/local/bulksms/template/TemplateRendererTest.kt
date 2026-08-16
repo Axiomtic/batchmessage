@@ -3,9 +3,11 @@ package com.local.bulksms.template
 import com.local.bulksms.model.DynamicColumn
 import com.local.bulksms.model.DynamicRow
 import com.local.bulksms.model.ImportedTable
+import com.local.bulksms.model.MessageDraft
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class TemplateRendererTest {
@@ -118,5 +120,83 @@ class TemplateRendererTest {
 
         assertEquals("张三您好，金额100", draft.currentBody)
         assertEquals("", draft.phoneNumber)
+    }
+
+    @Test
+    fun messageDraftRequiresColumnContext() {
+        assertThrows(IllegalArgumentException::class.java) {
+            MessageDraft(
+                rowId = 7L,
+                phoneNumber = "",
+                generatedBody = "正文",
+                currentBody = "正文",
+                columnNames = emptyList(),
+                phoneColumnIndex = null,
+            )
+        }
+    }
+
+    @Test
+    fun messageDraftRejectsDuplicateColumnNames() {
+        assertThrows(IllegalArgumentException::class.java) {
+            MessageDraft(
+                rowId = 7L,
+                phoneNumber = "",
+                generatedBody = "正文",
+                currentBody = "正文",
+                columnNames = listOf("姓名", "姓名"),
+                phoneColumnIndex = null,
+            )
+        }
+    }
+
+    @Test
+    fun messageDraftRejectsPhoneColumnOutsideColumnRange() {
+        assertThrows(IllegalArgumentException::class.java) {
+            MessageDraft(
+                rowId = 7L,
+                phoneNumber = "13800138000",
+                generatedBody = "正文",
+                currentBody = "正文",
+                columnNames = listOf("手机号"),
+                phoneColumnIndex = 1,
+            )
+        }
+    }
+
+    @Test
+    fun explicitNullPhoneColumnStillResynchronizes() {
+        val namesOnlyRenderer = TemplateRenderer(listOf("姓名", "金额"), null)
+        val original = namesOnlyRenderer.renderDraft(
+            DynamicRow(7L, listOf("张三", "100")),
+            template,
+        )
+
+        val refreshed = DraftSynchronizer.regenerate(
+            original,
+            DynamicRow(7L, listOf("张三", "200")),
+            template,
+        )
+
+        assertEquals("张三您好，金额200", refreshed.currentBody)
+        assertEquals("", refreshed.phoneNumber)
+    }
+
+    @Test
+    fun renderDraftRejectsMissingVariable() {
+        assertThrows(IllegalArgumentException::class.java) {
+            renderer.renderDraft(row, "{姓名} {日期}")
+        }
+    }
+
+    @Test
+    fun disablingSyncLeavesDraftBodiesUnchanged() {
+        val original = renderer.renderDraft(row, template)
+
+        val disabled = DraftSynchronizer.setSynced(original, false, changedRow, template)
+
+        assertFalse(disabled.syncWithTable)
+        assertEquals(original.generatedBody, disabled.generatedBody)
+        assertEquals(original.currentBody, disabled.currentBody)
     }
 }
