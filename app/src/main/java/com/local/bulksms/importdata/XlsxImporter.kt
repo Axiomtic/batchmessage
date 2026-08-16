@@ -1,0 +1,410 @@
+package com.local.bulksms.importdata
+
+import com.local.bulksms.model.RawTable
+import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
+import java.io.InputStream
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.GregorianCalendar
+import java.util.Locale
+import java.util.TimeZone
+import java.util.zip.ZipInputStream
+import javax.xml.parsers.DocumentBuilderFactory
+import org.w3c.dom.Document
+import org.w3c.dom.Element
+import org.w3c.dom.Node
+import org.xml.sax.InputSource
+import java.io.StringReader
+
+/**
+ * Reads the first visible worksheet from an OOXML workbook without a runtime library dependency.
+ *
+ * The importer deliberately returns at most 101 raw rows. The extra row is needed because the
+ * first row may be a header; [HeaderDetector] makes the final 100-data-row decision once the user
+ * has selected the header mode.
+ */
+class XlsxImporter : TableImporter {
+    override fun import(input: InputStream): RawTable {
+        val entries = unzipEntries(input)
+        val workbook = parseWorkbook(requiredEntry(entries, WORKBOOK_PATH))
+        val sheet = workbook.firstOrNull { !it.hidden }
+            ?: error("工作簿没有可见工作表")
+        val relationships = requiredEntry(entries, WORKBOOK_RELATIONSHIPS_PATH)
+        val sheetPath = resolveSheetPath(relationships, sheet.relationshipId)
+        val sheetXml = entries[sheetPath]
+            ?: throw IllegalArgumentException("工作表关系指向不存在的条目: $sheetPath")
+        val sharedStrings = entries[SHARED_STRINGS_PATH]
+            ?.let(::parseSharedStrings)
+            .orEmpty()
+        val dateStyles = entries[STYLES_PATH]
+            ?.let(::parseDateStyleIndexes)
+            .orEmpty()
+        return parseSheet(sheetXml, sharedStrings, dateStyles)
+    }
+
+    private fun unzipEntries(input: InputStream): Map<String, ByteArray> {
+        val entries = linkedMapOf<String, ByteArray>()
+        var totalBytes = 0L
+        val buffer = ByteArray(BUFFER_SIZE)
+
+        ZipInputStream(input).use { zip ->
+            while (true) {
+                val entry = zip.nextEntry ?: break
+                val path = validateZipEntryPath(entry.name)
+                if (entry.isDirectory) {
+                    zip.closeEntry()
+                    continue
+                }
+                if (entries.containsKey(path)) {
+                    throw IllegalArgumentException("XLSX 包含重复条目: $path")
+                }
+                if (entry.size > MAX_UNCOMPRESSED_BYTES) {
+                    throw IllegalArgumentException("XLSX 解压数据超过 8 MiB 限制")
+                }
+
+                val output = ByteArrayOutputStream()
+                while (true) {
+                    val read = zip.read(buffer)
+                    if (read < 0) break
+                    totalBytes += read.toLong()
+                    if (totalBytes > MAX_UNCOMPRESSED_BYTES) {
+                        throw IllegalArgumentException("XLSX 解压数据超过 8 MiB 限制")
+                    }
+                    output.write(buffer, 0, read)
+                }
+                entries[path] = output.toByteArray()
+                zip.closeEntry()
+            }
+        }
+        return entries
+    }
+
+    private fun validateZipEntryPath(name: String): String {
+        if (name.isBlank() || name.indexOf('\u0000') >= 0) {
+            throw IllegalArgumentException("XLSX 包含无效条目路径")
+        }
+        if (name.startsWith('/') || name.startsWith('\\') || DRIVE_PATH.matches(name)) {
+            throw IllegalArgumentException("XLSX 条目路径必须是相对路径: $name")
+        }
+        if (name.indexOf('\\') >= 0) {
+            throw IllegalArgumentException("XLSX 条目路径不得包含反斜杠: $name")
+        }
+
+        val pathWithoutTrailingSlash = name.removeSuffix("/")
+        val parts = pathWithoutTrailingSlash.split('/')
+        if (parts.any { it.isEmpty() || it == "." || it == ".." }) {
+            throw IllegalArgumentException("XLSX 条目路径包含非法分段: $name")
+        }
+        return name
+    }
+
+    private fun parseWorkbook(bytes: ByteArray): List<WorkbookSheet> {
+        val document = parseXml(bytes, WORKBOOK_PATH)
+        return descendantElements(document, "sheet").map { sheet ->
+            val relationshipId = sheet.attribute("r:id")
+                .ifBlank { sheet.attribute("id") }
+                .ifBlank { throw IllegalArgumentException("工作表缺少关系 ID") }
+            WorkbookSheet(
+                relationshipId = relationshipId,
+                hidden = sheet.attribute("state").lowercase(Locale.US) in HIDDEN_STATES,
+            )
+        }
+    }
+
+    private fun resolveSheetPath(relationshipsBytes: ByteArray, relationshipId: String): String {
+        val document = parseXml(relationshipsBytes, WORKBOOK_RELATIONSHIPS_PATH)
+        val relationship = descendantElements(document, "Relationship")
+            .firstOrNull { it.attribute("Id") == relationshipId }
+            ?: throw IllegalArgumentException("找不到工作表关系: $relationshipId")
+        val target = relationship.attribute("Target")
+            .ifBlank { throw IllegalArgumentException("工作表关系缺少目标路径: $relationshipId") }
+        if (target.indexOf('\\') >= 0 || target.split('/').any { it == ".." || it == "." }) {
+            throw IllegalArgumentException("工作表关系路径包含非法分段: $target")
+        }
+        val path = target.removePrefix("/").let { targetPath ->
+            if (targetPath.startsWith("xl/")) targetPath else "xl/$targetPath"
+        }
+        return validateZipEntryPath(path)
+    }
+
+    private fun parseSharedStrings(bytes: ByteArray): List<String> {
+        val document = parseXml(bytes, SHARED_STRINGS_PATH)
+        return descendantElements(document, "si").map { stringItem ->
+            descendantElements(stringItem, "t").joinToString(separator = "") { it.textContent }
+        }
+    }
+
+    private fun parseDateStyleIndexes(bytes: ByteArray): Map<Int, DateStyle> {
+        val document = parseXml(bytes, STYLES_PATH)
+        val customFormats = descendantElements(document, "numFmt").mapNotNull { format ->
+            val id = format.attribute("numFmtId").toIntOrNull() ?: return@mapNotNull null
+            id to format.attribute("formatCode")
+        }.toMap()
+        val cellXfs = descendantElements(document, "cellXfs").firstOrNull() ?: return emptyMap()
+        return childElements(cellXfs, "xf").mapIndexedNotNull { styleIndex, xf ->
+            val numFmtId = xf.attribute("numFmtId").toIntOrNull() ?: return@mapIndexedNotNull null
+            val formatCode = customFormats[numFmtId] ?: builtInDateFormat(numFmtId)
+                ?: return@mapIndexedNotNull null
+            if (!isDateFormat(formatCode)) return@mapIndexedNotNull null
+            styleIndex to DateStyle(hasTime = hasTimePart(formatCode))
+        }.toMap()
+    }
+
+    private fun parseSheet(
+        bytes: ByteArray,
+        sharedStrings: List<String>,
+        dateStyles: Map<Int, DateStyle>,
+    ): RawTable {
+        val document = parseXml(bytes, "工作表")
+        val rowElements = descendantElements(document, "row")
+        if (rowElements.isEmpty()) {
+            error("工作表为空")
+        }
+
+        val rows = mutableListOf<List<String>>()
+        val warnings = mutableListOf<String>()
+        for (rowElement in rowElements) {
+            val nextRowNumber = rows.size + 1
+            if (nextRowNumber > MAX_RAW_ROWS) {
+                throw ImportLimitExceeded(nextRowNumber)
+            }
+            val cells = mutableMapOf<Int, String>()
+            var implicitColumn = 0
+            for (cell in childElements(rowElement, "c")) {
+                val reference = cell.attribute("r")
+                val columnIndex = columnIndex(reference) ?: run {
+                    while (cells.containsKey(implicitColumn)) implicitColumn++
+                    implicitColumn
+                }
+                implicitColumn = maxOf(implicitColumn + 1, columnIndex + 1)
+                cells[columnIndex] = parseCell(cell, sharedStrings, dateStyles, warnings)
+            }
+            val width = cells.keys.maxOrNull()?.plus(1) ?: 0
+            rows += List(width) { index -> cells[index].orEmpty() }
+        }
+
+        val width = rows.maxOfOrNull { it.size } ?: 0
+        if (width == 0 || rows.all { row -> row.all(String::isEmpty) }) {
+            error("工作表为空")
+        }
+        val normalizedRows = rows.map { row ->
+            if (row.size >= width) row else row + List(width - row.size) { "" }
+        }
+        return RawTable(rows = normalizedRows, warnings = warnings)
+    }
+
+    private fun parseCell(
+        cell: Element,
+        sharedStrings: List<String>,
+        dateStyles: Map<Int, DateStyle>,
+        warnings: MutableList<String>,
+    ): String {
+        val reference = cell.attribute("r").ifBlank { "未知单元格" }
+        val type = cell.attribute("t")
+        val valueElement = childElements(cell, "v").firstOrNull()
+        val rawValue = valueElement?.textContent.orEmpty()
+        val trimmedValue = rawValue.trim()
+        val formula = childElements(cell, "f").isNotEmpty()
+        val inlineElement = childElements(cell, "is").firstOrNull()
+        if (formula && (valueElement == null || trimmedValue.isEmpty())) {
+            warnings += "公式单元格 $reference 没有缓存值，已留空"
+            return ""
+        }
+
+        if (type == "inlineStr") {
+            return inlineElement?.let(::richTextValue).orEmpty()
+        }
+        if (type == "s") {
+            val index = trimmedValue.toIntOrNull()
+            return if (index != null && index in sharedStrings.indices) {
+                sharedStrings[index]
+            } else {
+                warnings += "单元格 $reference 的共享字符串索引无效，已留空"
+                ""
+            }
+        }
+        if (type == "b") {
+            return when (trimmedValue.lowercase(Locale.US)) {
+                "1", "true" -> "TRUE"
+                "0", "false" -> "FALSE"
+                else -> rawValue
+            }
+        }
+        val style = cell.attribute("s").toIntOrNull()?.let(dateStyles::get)
+        if (style != null && trimmedValue.isNotBlank() && (type.isBlank() || type == "n" || formula)) {
+            formatExcelDate(trimmedValue, style.hasTime)?.let { return it }
+        }
+        return if (type.isBlank() || type == "n" || formula) trimmedValue else rawValue
+    }
+
+    private fun richTextValue(element: Element): String =
+        descendantElements(element, "t").joinToString(separator = "") { it.textContent }
+
+    private fun formatExcelDate(serialText: String, hasTime: Boolean): String? {
+        val serial = serialText.toDoubleOrNull() ?: return null
+        if (!serial.isFinite()) return null
+        return try {
+            var milliseconds = Math.round(serial * MILLIS_PER_DAY)
+            if (serial >= 60.0) milliseconds -= MILLIS_PER_DAY
+            val date = Date(EXCEL_EPOCH_MILLIS + milliseconds)
+            if (!hasTime) {
+                dateFormat("yyyy-MM-dd").format(date)
+            } else {
+                val full = dateFormat("yyyy-MM-dd HH:mm:ss.SSS").format(date)
+                if (full.endsWith(".000")) full.removeSuffix(".000") else full
+            }
+        } catch (_: ArithmeticException) {
+            null
+        } catch (_: RuntimeException) {
+            null
+        }
+    }
+
+    private fun parseXml(bytes: ByteArray, description: String): Document {
+        try {
+            val factory = DocumentBuilderFactory.newInstance().apply {
+                isNamespaceAware = true
+                isExpandEntityReferences = false
+                setFeatureIfSupported("http://apache.org/xml/features/disallow-doctype-decl", true)
+                setFeatureIfSupported("http://xml.org/sax/features/external-general-entities", false)
+                setFeatureIfSupported("http://xml.org/sax/features/external-parameter-entities", false)
+                setFeatureIfSupported("http://apache.org/xml/features/nonvalidating/load-external-dtd", false)
+                setAttributeIfSupported("http://javax.xml.XMLConstants/property/accessExternalDTD", "")
+                setAttributeIfSupported("http://javax.xml.XMLConstants/property/accessExternalSchema", "")
+                isXIncludeAware = false
+            }
+            val builder = factory.newDocumentBuilder()
+            builder.setEntityResolver(org.xml.sax.EntityResolver { _, _ ->
+                InputSource(StringReader(""))
+            })
+            return builder.parse(ByteArrayInputStream(bytes))
+        } catch (exception: Exception) {
+            throw IllegalArgumentException("无法解析 $description", exception)
+        }
+    }
+
+    private fun DocumentBuilderFactory.setFeatureIfSupported(name: String, value: Boolean) {
+        try {
+            setFeature(name, value)
+        } catch (_: Exception) {
+            // Android XML implementations can omit optional parser features. The resolver and
+            // external-access attributes above still prevent external entity resolution.
+        }
+    }
+
+    private fun DocumentBuilderFactory.setAttributeIfSupported(name: String, value: String) {
+        try {
+            setAttribute(name, value)
+        } catch (_: Exception) {
+            // See setFeatureIfSupported.
+        }
+    }
+
+    private fun descendantElements(node: Node, name: String): List<Element> {
+        val withNamespace = (node as? Document)?.getElementsByTagNameNS("*", name)
+            ?: (node as? Element)?.getElementsByTagNameNS("*", name)
+        if (withNamespace != null && withNamespace.length > 0) {
+            return (0 until withNamespace.length).mapNotNull { withNamespace.item(it) as? Element }
+        }
+        val withoutNamespace = when (node) {
+            is Document -> node.getElementsByTagName(name)
+            is Element -> node.getElementsByTagName(name)
+            else -> null
+        } ?: return emptyList()
+        return (0 until withoutNamespace.length).mapNotNull { withoutNamespace.item(it) as? Element }
+    }
+
+    private fun childElements(parent: Element, name: String): List<Element> {
+        val result = mutableListOf<Element>()
+        var child = parent.firstChild
+        while (child != null) {
+            if (child is Element && (child.localName == name || child.tagName == name)) {
+                result += child
+            }
+            child = child.nextSibling
+        }
+        return result
+    }
+
+    private fun Element.attribute(name: String): String {
+        val direct = getAttribute(name).orEmpty()
+        if (direct.isNotBlank() || !name.contains(':')) return direct
+        return getAttributeNS(RELATIONSHIPS_NS, name.substringAfter(':')).orEmpty()
+    }
+
+    private fun dateFormat(pattern: String): SimpleDateFormat =
+        SimpleDateFormat(pattern, Locale.US).apply {
+            timeZone = TimeZone.getTimeZone("UTC")
+        }
+
+    private fun columnIndex(reference: String): Int? {
+        if (reference.isBlank()) return null
+        val letters = reference.trim('$').takeWhile { it in 'A'..'Z' || it in 'a'..'z' }
+        if (letters.isEmpty()) return null
+        var index = 0L
+        for (letter in letters) {
+            index = index * 26 + (letter.uppercaseChar() - 'A' + 1)
+            if (index > Int.MAX_VALUE.toLong()) return null
+        }
+        return (index - 1).toInt()
+    }
+
+    private fun isDateFormat(formatCode: String): Boolean {
+        val stripped = formatCode
+            .replace(Regex("\\\"[^\\\"]*\\\""), "")
+            .replace(Regex("\\\\."), "")
+            .lowercase(Locale.US)
+        return stripped.any { it == 'y' || it == 'd' || it == 'h' || it == 's' } ||
+            (stripped.contains('m') && !stripped.matches(Regex(".*[0#?].*")))
+    }
+
+    private fun hasTimePart(formatCode: String): Boolean {
+        val stripped = formatCode.lowercase(Locale.US)
+        return stripped.contains('h') || stripped.contains('s') || stripped.contains("am/pm")
+    }
+
+    private fun builtInDateFormat(numFmtId: Int): String? = when (numFmtId) {
+        14 -> "yyyy-mm-dd"
+        15 -> "d-mmm-yy"
+        16 -> "d-mmm"
+        17 -> "mmm-yy"
+        18 -> "h:mm AM/PM"
+        19 -> "h:mm:ss AM/PM"
+        20 -> "h:mm"
+        21 -> "h:mm:ss"
+        22 -> "m/d/yy h:mm"
+        45 -> "mm:ss"
+        46 -> "[h]:mm:ss"
+        47 -> "mmss.0"
+        else -> null
+    }
+
+    private data class WorkbookSheet(
+        val relationshipId: String,
+        val hidden: Boolean,
+    )
+
+    private data class DateStyle(val hasTime: Boolean)
+
+    private fun requiredEntry(entries: Map<String, ByteArray>, path: String): ByteArray =
+        entries[path] ?: throw IllegalArgumentException("XLSX 缺少必需条目: $path")
+
+    private companion object {
+        const val WORKBOOK_PATH = "xl/workbook.xml"
+        const val WORKBOOK_RELATIONSHIPS_PATH = "xl/_rels/workbook.xml.rels"
+        const val SHARED_STRINGS_PATH = "xl/sharedStrings.xml"
+        const val STYLES_PATH = "xl/styles.xml"
+        const val MAX_UNCOMPRESSED_BYTES = 8L * 1024L * 1024L
+        const val MAX_RAW_ROWS = HeaderDetector.MAX_DATA_ROWS + 1
+        const val BUFFER_SIZE = 8 * 1024
+        const val MILLIS_PER_DAY = 86_400_000L
+        val HIDDEN_STATES = setOf("hidden", "veryhidden")
+        val DRIVE_PATH = Regex("^[A-Za-z]:.*")
+        const val RELATIONSHIPS_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+        val EXCEL_EPOCH_MILLIS = GregorianCalendar(TimeZone.getTimeZone("UTC")).apply {
+            clear()
+            set(1899, GregorianCalendar.DECEMBER, 31, 0, 0, 0)
+        }.timeInMillis
+    }
+}
