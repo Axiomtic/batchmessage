@@ -1,10 +1,81 @@
 package com.local.bulksms.ui.send
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 class SendFlowViewModelTest {
+    @Test
+    fun defaultStateStartsWithThreeColumnsFiveRowsAndGeneratedDrafts() {
+        val state = SendFlowViewModel().state.value
+
+        assertEquals(listOf("名字", "电话", "服务到期日期"), state.table?.columns?.map { it.name })
+        assertEquals(5, state.table?.rows?.size)
+        assertEquals(1, state.selectedPhoneColumn)
+        assertEquals(2, state.drafts.size)
+        assertEquals(
+            "您好，张三，您的服务将于2026-09-30到期，请及时办理续期。如已办理，请忽略本短信。",
+            state.drafts.first().currentBody,
+        )
+    }
+
+    @Test
+    fun addingRowsAndColumnsKeepsTableDirectlyEditable() {
+        val viewModel = SendFlowViewModel()
+
+        viewModel.addRow()
+        viewModel.addColumn()
+        val state = viewModel.state.value
+
+        assertEquals(6, state.table?.rows?.size)
+        assertEquals(listOf("名字", "电话", "服务到期日期", "4"), state.table?.columns?.map { it.name })
+        viewModel.editCell(5L, 3, "现场输入")
+        assertEquals("现场输入", viewModel.state.value.table?.rows?.last()?.cells?.last())
+    }
+
+    @Test
+    fun importedRowsWaitForConfirmationWhenCurrentTableHasData() {
+        val viewModel = SendFlowViewModel()
+
+        viewModel.requestClipboardImport("名字\t电话\n王五\t13700137000")
+
+        assertNotNull(viewModel.state.value.pendingImport)
+        assertEquals("张三", viewModel.state.value.table?.rows?.first()?.cells?.first())
+        viewModel.cancelPendingImport()
+        assertNull(viewModel.state.value.pendingImport)
+        assertEquals("张三", viewModel.state.value.table?.rows?.first()?.cells?.first())
+    }
+
+    @Test
+    fun unsyncedDraftSurvivesConfirmedImport() {
+        val viewModel = SendFlowViewModel()
+        viewModel.editDraft(0L, "保留这条")
+
+        viewModel.requestClipboardImport("名字\t电话\t服务到期日期\n王五\t13700137000\t2027-01-01")
+        viewModel.confirmPendingImport()
+
+        val draft = viewModel.state.value.drafts.first { it.rowId == 0L }
+        assertEquals(false, draft.syncWithTable)
+        assertEquals("保留这条", draft.currentBody)
+        assertEquals("王五", viewModel.state.value.table?.rows?.first()?.cells?.first())
+    }
+
+    @Test
+    fun liveTemplateEditAndBulkSyncRegenerateMappedDrafts() {
+        val viewModel = SendFlowViewModel()
+        viewModel.unsyncAllDrafts()
+        val protectedBodies = viewModel.state.value.drafts.map { it.currentBody }
+
+        viewModel.updateTemplateBody("{名字}的新提醒")
+
+        assertEquals(protectedBodies, viewModel.state.value.drafts.map { it.currentBody })
+        viewModel.syncAllDrafts()
+        assertEquals(listOf("张三的新提醒", "李四的新提醒"), viewModel.state.value.drafts.map { it.currentBody })
+        assertNotEquals(protectedBodies, viewModel.state.value.drafts.map { it.currentBody })
+    }
+
     @Test
     fun manualDraftEditIsProtectedUntilSyncIsReenabled() {
         val viewModel = SendFlowViewModel()
