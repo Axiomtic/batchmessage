@@ -1,0 +1,172 @@
+package com.local.bulksms.template
+
+import com.local.bulksms.model.DynamicColumn
+import com.local.bulksms.model.DynamicRow
+import com.local.bulksms.model.ImportedTable
+import com.local.bulksms.model.MessageDraft
+
+class TemplateRenderer(
+    private val columns: List<DynamicColumn> = emptyList(),
+    private val phoneColumnIndex: Int? = null,
+) {
+    constructor(table: ImportedTable) : this(table.columns, table.phoneColumnIndex)
+
+    constructor(columnNames: Collection<String>, phoneColumnIndex: Int? = null) : this(
+        columnNames.mapIndexed(::DynamicColumn),
+        phoneColumnIndex,
+    )
+
+    private val token = Regex("\\{([^{}]+)}")
+
+    fun validate(template: String, columns: List<String>): Set<String> =
+        token.findAll(template)
+            .map { it.groupValues[1] }
+            .toSet() - columns.toSet()
+
+    fun validate(template: String): Set<String> =
+        validate(template, columns.map(DynamicColumn::name))
+
+    fun render(template: String, values: Map<String, String>): String =
+        token.replace(template) { match -> values.getValue(match.groupValues[1]) }
+
+    fun renderDraft(row: DynamicRow, template: String): MessageDraft {
+        require(columns.isNotEmpty()) { "渲染草稿需要动态列" }
+        return renderDraftWithColumns(row, template, columns, phoneColumnIndex)
+    }
+
+    internal fun renderDraftWithColumns(
+        row: DynamicRow,
+        template: String,
+        columns: List<DynamicColumn>,
+        phoneColumnIndex: Int?,
+    ): MessageDraft {
+        val columnNames = columns.map(DynamicColumn::name)
+        val missing = validate(template, columnNames)
+        require(missing.isEmpty()) { "模板包含不存在的变量: ${missing.joinToString("、")}" }
+
+        val values = columns.mapIndexed { index, column ->
+            column.name to row.cells.getOrElse(index) { "" }
+        }.toMap()
+        val body = render(template, values)
+        val phoneNumber = phoneColumnIndex?.let { row.cells.getOrNull(it).orEmpty() }.orEmpty()
+        return MessageDraft(
+            rowId = row.id,
+            phoneNumber = phoneNumber,
+            generatedBody = body,
+            currentBody = body,
+            columnNames = columnNames,
+            phoneColumnIndex = phoneColumnIndex,
+        )
+    }
+
+    internal fun renderDraft(
+        row: DynamicRow,
+        template: String,
+        columnNames: List<String>,
+        phoneColumnIndex: Int?,
+    ): MessageDraft = renderDraftWithColumns(
+        row = row,
+        template = template,
+        columns = columnNames.mapIndexed(::DynamicColumn),
+        phoneColumnIndex = phoneColumnIndex,
+    )
+}
+
+object DraftSynchronizer {
+    fun editBody(draft: MessageDraft, body: String): MessageDraft =
+        draft.copy(
+            currentBody = body,
+            syncWithTable = false,
+            manuallyEdited = true,
+        )
+
+    fun regenerate(
+        draft: MessageDraft,
+        row: DynamicRow,
+        template: String,
+    ): MessageDraft {
+        if (!draft.syncWithTable) return draft
+        return rendererFor(draft).renderDraft(row, template).copy(
+            syncWithTable = true,
+            manuallyEdited = draft.manuallyEdited,
+        )
+    }
+
+    fun regenerate(
+        draft: MessageDraft,
+        row: DynamicRow,
+        template: String,
+        renderer: TemplateRenderer,
+    ): MessageDraft {
+        if (!draft.syncWithTable) return draft
+        return renderer.renderDraft(row, template).copy(
+            syncWithTable = true,
+            manuallyEdited = draft.manuallyEdited,
+        )
+    }
+
+    fun regenerate(
+        draft: MessageDraft,
+        row: DynamicRow,
+        template: String,
+        columnNames: List<String>,
+        phoneColumnIndex: Int? = draft.phoneColumnIndex,
+    ): MessageDraft {
+        if (!draft.syncWithTable) return draft
+        return rendererFor(columnNames, phoneColumnIndex).renderDraft(row, template).copy(
+            syncWithTable = true,
+            manuallyEdited = draft.manuallyEdited,
+        )
+    }
+
+    fun setSynced(
+        draft: MessageDraft,
+        synced: Boolean,
+        row: DynamicRow,
+        template: String,
+    ): MessageDraft {
+        if (!synced) return draft.copy(syncWithTable = false)
+        return rendererFor(draft).renderDraft(row, template).copy(
+            syncWithTable = true,
+            manuallyEdited = draft.manuallyEdited,
+        )
+    }
+
+    fun setSynced(
+        draft: MessageDraft,
+        synced: Boolean,
+        row: DynamicRow,
+        template: String,
+        renderer: TemplateRenderer,
+    ): MessageDraft {
+        if (!synced) return draft.copy(syncWithTable = false)
+        return renderer.renderDraft(row, template).copy(
+            syncWithTable = true,
+            manuallyEdited = draft.manuallyEdited,
+        )
+    }
+
+    fun setSynced(
+        draft: MessageDraft,
+        synced: Boolean,
+        row: DynamicRow,
+        template: String,
+        columnNames: List<String>,
+        phoneColumnIndex: Int? = draft.phoneColumnIndex,
+    ): MessageDraft {
+        if (!synced) return draft.copy(syncWithTable = false)
+        return rendererFor(columnNames, phoneColumnIndex).renderDraft(row, template).copy(
+            syncWithTable = true,
+            manuallyEdited = draft.manuallyEdited,
+        )
+    }
+
+    private fun rendererFor(draft: MessageDraft): TemplateRenderer =
+        rendererFor(draft.columnNames, draft.phoneColumnIndex)
+
+    private fun rendererFor(columnNames: List<String>, phoneColumnIndex: Int?): TemplateRenderer =
+        TemplateRenderer(
+            columns = columnNames.mapIndexed(::DynamicColumn),
+            phoneColumnIndex = phoneColumnIndex,
+        )
+}
