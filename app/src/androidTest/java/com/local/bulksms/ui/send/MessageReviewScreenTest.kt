@@ -8,7 +8,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.state.ToggleableState
@@ -49,7 +49,7 @@ class MessageReviewScreenTest {
 
         composeRule.onNodeWithTag("message-body-7").performTextReplacement("张三您好，已延期")
 
-        composeRule.onNodeWithText("与表同步").assert(
+        composeRule.onNodeWithContentDescription("与表同步").assert(
             SemanticsMatcher.expectValue(SemanticsProperties.ToggleableState, ToggleableState.Off),
         )
         composeRule.onNodeWithTag("recipient-title-card").assertDoesNotExist()

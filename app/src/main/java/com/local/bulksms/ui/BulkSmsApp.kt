@@ -8,6 +8,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -59,6 +60,7 @@ fun BulkSmsApp(
             NavigationBar {
                 AppDestination.entries.forEach { destination ->
                     NavigationBarItem(
+                        modifier = Modifier.testTag("nav-${destination.route}"),
                         selected = currentRoute == destination.route,
                         onClick = {
                             navController.navigate(destination.route) {

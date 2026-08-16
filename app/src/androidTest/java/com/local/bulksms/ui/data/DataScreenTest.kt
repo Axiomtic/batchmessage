@@ -21,10 +21,11 @@ class DataScreenTest {
     fun dataPageUsesImportCardsAndEdgeAddButtons() {
         var addedRows = 0
         var addedColumns = 0
+        val state = SendFlowViewModel().state.value
         composeRule.setContent {
             MaterialTheme {
                 DataScreen(
-                    state = SendFlowViewModel().state.value,
+                    state = state,
                     callbacks = BulkSmsCallbacks(
                         onAddRow = { addedRows++ },
                         onAddColumn = { addedColumns++ },
@@ -44,9 +45,10 @@ class DataScreenTest {
 
     @Test
     fun longPressingLabelsRequestsSpecificDeletion() {
+        val state = SendFlowViewModel().state.value
         composeRule.setContent {
             MaterialTheme {
-                DataScreen(SendFlowViewModel().state.value, BulkSmsCallbacks())
+                DataScreen(state, BulkSmsCallbacks())
             }
         }
 

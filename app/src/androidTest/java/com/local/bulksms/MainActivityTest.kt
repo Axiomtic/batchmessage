@@ -2,6 +2,7 @@ package com.local.bulksms
 
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import org.junit.Rule
 import org.junit.Test
@@ -14,10 +15,10 @@ class MainActivityTest {
     fun launchStartsOnDataAndBottomNavigationOpensEveryPage() {
         composeRule.onNodeWithText("导入数据").assertExists()
 
-        composeRule.onNodeWithText("短信").performClick()
-        composeRule.onNodeWithText("短信预览").assertExists()
+        composeRule.onNodeWithTag("nav-sms").performClick()
+        composeRule.onNodeWithText("短信预览", substring = true).assertExists()
 
-        composeRule.onNodeWithText("设置").performClick()
+        composeRule.onNodeWithTag("nav-settings").performClick()
         composeRule.onNodeWithText("忽略首行").assertExists()
     }
 }

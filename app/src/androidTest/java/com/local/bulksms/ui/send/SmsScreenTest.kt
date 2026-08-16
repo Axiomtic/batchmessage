@@ -21,10 +21,11 @@ class SmsScreenTest {
 
     @Test
     fun templateActionsUseInlineAddDeleteAndDirtyGatedSave() {
+        val state = SendFlowViewModel().state.value
         composeRule.setContent {
             MaterialTheme {
                 SmsScreen(
-                    state = SendFlowViewModel().state.value,
+                    state = state,
                     templateState = TemplateUiState(
                         templates = listOf(template),
                         selectedTemplateId = template.id,
@@ -47,10 +48,11 @@ class SmsScreenTest {
 
     @Test
     fun saveEnablesOnlyForChangedBody() {
+        val state = SendFlowViewModel().state.value
         composeRule.setContent {
             MaterialTheme {
                 SmsScreen(
-                    state = SendFlowViewModel().state.value,
+                    state = state,
                     templateState = TemplateUiState(
                         templates = listOf(template),
                         selectedTemplateId = template.id,
