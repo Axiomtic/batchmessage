@@ -22,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 import com.local.bulksms.model.ImportedTable
 
 data class CellEdit(
@@ -30,16 +31,27 @@ data class CellEdit(
     val value: String,
 )
 
+data class HeaderEdit(
+    val columnIndex: Int,
+    val value: String,
+)
+
 @Composable
 fun EditableTable(
     table: ImportedTable,
     onCellChanged: (CellEdit) -> Unit,
+    onHeaderChanged: (HeaderEdit) -> Unit = {},
     onPhoneColumnSelected: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val horizontalScroll = rememberScrollState()
     val verticalScroll = rememberScrollState()
     val borderColor = MaterialTheme.colorScheme.outlineVariant
+    val columnWidths = table.columns.mapIndexed { columnIndex, column ->
+        contentAwareColumnWidth(
+            listOf(column.name) + table.rows.map { row -> row.cells.getOrNull(columnIndex).orEmpty() },
+        )
+    }
 
     Box(
         modifier = modifier
@@ -55,22 +67,36 @@ fun EditableTable(
             Row {
                 table.columns.forEachIndexed { index, column ->
                     val selected = index == table.phoneColumnIndex
-                    Box(
+                    Column(
                         modifier = Modifier
-                            .width(CELL_WIDTH)
-                            .heightIn(min = 48.dp)
+                            .width(columnWidths[index])
+                            .heightIn(min = 56.dp)
                             .background(
                                 if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
                             )
                             .border(0.5.dp, borderColor)
-                            .clickable { onPhoneColumnSelected(index) }
-                            .padding(horizontal = 10.dp, vertical = 12.dp)
-                            .testTag("column-header-$index"),
-                        contentAlignment = Alignment.CenterStart,
+                            .padding(horizontal = 8.dp, vertical = 6.dp),
+                        verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(2.dp),
                     ) {
+                        BasicTextField(
+                            value = column.name,
+                            onValueChange = { onHeaderChanged(HeaderEdit(index, it)) },
+                            modifier = Modifier
+                                .width(columnWidths[index] - 16.dp)
+                                .testTag("header-$index-editor"),
+                            singleLine = true,
+                            textStyle = MaterialTheme.typography.labelLarge.copy(
+                                color = MaterialTheme.colorScheme.onSurface,
+                            ),
+                        )
                         Text(
-                            text = if (selected) "手机号 · ${column.name}" else column.name,
-                            style = MaterialTheme.typography.labelLarge,
+                            text = if (selected) "已选手机号列" else "点击设为手机号列",
+                            modifier = Modifier
+                                .width(columnWidths[index] - 16.dp)
+                                .clickable { onPhoneColumnSelected(index) }
+                                .testTag("column-header-$index"),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary,
                         )
                     }
                 }
@@ -85,7 +111,7 @@ fun EditableTable(
                                 onCellChanged(CellEdit(row.id, columnIndex, value))
                             },
                             modifier = Modifier
-                                .width(CELL_WIDTH)
+                                .width(columnWidths[columnIndex])
                                 .heightIn(min = 46.dp)
                                 .border(0.5.dp, borderColor)
                                 .padding(horizontal = 10.dp, vertical = 12.dp)
@@ -102,4 +128,9 @@ fun EditableTable(
     }
 }
 
-private val CELL_WIDTH = 160.dp
+internal fun contentAwareColumnWidth(values: List<String>): Dp {
+    val longestUnits = values.maxOfOrNull { value ->
+        value.sumOf { character -> if (character.code > 0xff) 2 else 1 }
+    } ?: 1
+    return (longestUnits * 7.2f + 24f).dp.coerceIn(76.dp, 240.dp)
+}

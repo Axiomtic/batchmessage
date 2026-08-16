@@ -103,4 +103,30 @@ class EditableTableTest {
         assertEquals(CellEdit(7L, 1, "张三丰"), lastEdit)
         assertEquals(1, selectedPhoneColumn)
     }
+
+    @Test
+    fun headerTextCanBeEditedWithoutLosingPhoneColumnSelection() {
+        val table = ImportedTable(
+            columns = listOf(DynamicColumn(0, "姓名"), DynamicColumn(1, "电话")),
+            rows = listOf(DynamicRow(0L, listOf("张三", "13800138000"))),
+            firstRowIsHeader = true,
+            phoneColumnIndex = 1,
+        )
+        var headerEdit: HeaderEdit? = null
+
+        composeRule.setContent {
+            MaterialTheme {
+                EditableTable(
+                    table = table,
+                    onCellChanged = {},
+                    onHeaderChanged = { headerEdit = it },
+                    onPhoneColumnSelected = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("header-0-editor").performTextReplacement("客户姓名")
+
+        assertEquals(HeaderEdit(0, "客户姓名"), headerEdit)
+    }
 }
