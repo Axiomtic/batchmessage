@@ -13,6 +13,7 @@ import com.local.bulksms.model.MessageDraft
 import com.local.bulksms.model.RawTable
 import com.local.bulksms.template.DraftSynchronizer
 import com.local.bulksms.template.TemplateRenderer
+import com.local.bulksms.sms.SimOption
 import java.io.InputStream
 import java.util.UUID
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -32,6 +33,8 @@ data class SendFlowUiState(
     val selectedTemplateBody: String? = null,
     val drafts: List<MessageDraft> = emptyList(),
     val missingTemplateVariables: Set<String> = emptySet(),
+    val simOptions: List<SimOption> = emptyList(),
+    val selectedSubscriptionId: Int? = null,
 )
 
 class SendFlowViewModel(
@@ -63,6 +66,20 @@ class SendFlowViewModel(
             selectedPhoneColumn = columnIndex,
             table = table.copy(phoneColumnIndex = columnIndex),
         )
+    }
+
+    fun setSimOptions(options: List<SimOption>) {
+        val current = mutableState.value
+        val selected = current.selectedSubscriptionId?.takeIf { id ->
+            options.any { it.subscriptionId == id }
+        } ?: options.singleOrNull()?.subscriptionId
+        mutableState.value = current.copy(simOptions = options, selectedSubscriptionId = selected)
+    }
+
+    fun selectSubscription(subscriptionId: Int) {
+        val current = mutableState.value
+        if (current.simOptions.none { it.subscriptionId == subscriptionId }) return
+        mutableState.value = current.copy(selectedSubscriptionId = subscriptionId)
     }
 
     fun selectTemplate(templateId: String, body: String) {
