@@ -15,7 +15,7 @@ data class WorkspaceSnapshot(
         const val DEFAULT_TEMPLATE_ID = "default-service-expiry"
         const val DEFAULT_TEMPLATE_NAME = "服务到期提醒"
         const val DEFAULT_TEMPLATE_BODY =
-            "您好，{名字}，您的服务将于{服务到期日期}到期，请及时办理续期。如已办理，请忽略本短信。"
+            "您好，{A}，您的服务将于{C}到期，请及时办理续期。如已办理，请忽略本短信。"
 
         fun sample(): WorkspaceSnapshot = WorkspaceSnapshot(
             importId = "current-import",

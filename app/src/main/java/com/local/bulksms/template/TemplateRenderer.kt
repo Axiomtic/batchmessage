@@ -18,16 +18,25 @@ class TemplateRenderer(
 
     private val token = Regex("\\{([^{}]+)\\}")
 
-    fun validate(template: String, columns: List<String>): Set<String> =
-        token.findAll(template)
-            .map { it.groupValues[1] }
-            .toSet() - columns.toSet()
+    private fun String.variableKey(): String = trim().uppercase()
+
+    fun validate(template: String, columns: List<String>): Set<String> {
+        val known = columns.mapTo(mutableSetOf()) { it.variableKey() }
+        return token.findAll(template)
+            .map { it.groupValues[1].variableKey() }
+            .filterNot(known::contains)
+            .toSet()
+    }
 
     fun validate(template: String): Set<String> =
         validate(template, columns.map(DynamicColumn::name))
 
-    fun render(template: String, values: Map<String, String>): String =
-        token.replace(template) { match -> values.getValue(match.groupValues[1]) }
+    fun render(template: String, values: Map<String, String>): String {
+        val normalized = values.mapKeys { (key, _) -> key.variableKey() }
+        return token.replace(template) { match ->
+            normalized.getValue(match.groupValues[1].variableKey())
+        }
+    }
 
     fun renderDraft(row: DynamicRow, template: String): MessageDraft {
         require(columns.isNotEmpty()) { "渲染草稿需要动态列" }

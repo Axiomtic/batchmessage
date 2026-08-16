@@ -11,7 +11,7 @@ class SendFlowViewModelTest {
     fun defaultStateStartsWithThreeColumnsFiveRowsAndGeneratedDrafts() {
         val state = SendFlowViewModel().state.value
 
-        assertEquals(listOf("名字", "电话", "服务到期日期"), state.table?.columns?.map { it.name })
+        assertEquals(listOf("A", "B", "C"), state.table?.columns?.map { it.name })
         assertEquals(5, state.table?.rows?.size)
         assertEquals(1, state.selectedPhoneColumn)
         assertEquals(2, state.drafts.size)
@@ -30,7 +30,7 @@ class SendFlowViewModelTest {
         val state = viewModel.state.value
 
         assertEquals(6, state.table?.rows?.size)
-        assertEquals(listOf("名字", "电话", "服务到期日期", "4"), state.table?.columns?.map { it.name })
+        assertEquals(listOf("A", "B", "C", "D"), state.table?.columns?.map { it.name })
         viewModel.editCell(5L, 3, "现场输入")
         assertEquals("现场输入", viewModel.state.value.table?.rows?.last()?.cells?.last())
     }
@@ -68,7 +68,7 @@ class SendFlowViewModelTest {
         viewModel.unsyncAllDrafts()
         val protectedBodies = viewModel.state.value.drafts.map { it.currentBody }
 
-        viewModel.updateTemplateBody("{名字}的新提醒")
+        viewModel.updateTemplateBody("{A}的新提醒")
 
         assertEquals(protectedBodies, viewModel.state.value.drafts.map { it.currentBody })
         viewModel.syncAllDrafts()
@@ -80,7 +80,7 @@ class SendFlowViewModelTest {
     fun manualDraftEditIsProtectedUntilSyncIsReenabled() {
         val viewModel = SendFlowViewModel()
         viewModel.importClipboard("手机号\t姓名\t金额\n13800138000\t张三\t100")
-        viewModel.selectTemplate("template-1", "{姓名}您好，金额{金额}")
+        viewModel.selectTemplate("template-1", "{B}您好，金额{C}")
 
         viewModel.editDraft(0L, "张三您好，已延期")
         viewModel.editCell(0L, 2, "200")
@@ -127,7 +127,7 @@ class SendFlowViewModelTest {
         val state = viewModel.state.value
         assertEquals(true, state.detectedHeader)
         assertEquals(true, state.table?.firstRowIsHeader)
-        assertEquals(listOf("手机号", "姓名"), state.table?.columns?.map { it.name })
+        assertEquals(listOf("A", "B"), state.table?.columns?.map { it.name })
         assertEquals(1, state.table?.rows?.size)
     }
 
@@ -140,7 +140,7 @@ class SendFlowViewModelTest {
 
         val state = viewModel.state.value
         assertNotNull(state.rawTable)
-        assertEquals(listOf("列1", "列2"), state.table?.columns?.map { it.name })
+        assertEquals(listOf("A", "B"), state.table?.columns?.map { it.name })
         assertEquals("手机号", state.table?.rows?.first()?.cells?.first())
         assertEquals(2, state.rawTable?.rows?.size)
     }

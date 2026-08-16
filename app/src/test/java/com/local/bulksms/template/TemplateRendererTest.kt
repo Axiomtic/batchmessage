@@ -11,6 +11,18 @@ import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class TemplateRendererTest {
+    @Test
+    fun variablesAreCaseInsensitive() {
+        val renderer = TemplateRenderer(listOf("A", "B"), phoneColumnIndex = 1)
+
+        val draft = renderer.renderDraft(
+            DynamicRow(0L, listOf("张三", "13800138000")),
+            "{a}-{B}",
+        )
+
+        assertEquals("张三-13800138000", draft.currentBody)
+    }
+
     private val table = ImportedTable(
         columns = listOf(
             DynamicColumn(0, "手机号"),

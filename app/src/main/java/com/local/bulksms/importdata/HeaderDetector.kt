@@ -4,6 +4,7 @@ import com.local.bulksms.model.DynamicColumn
 import com.local.bulksms.model.DynamicRow
 import com.local.bulksms.model.ImportedTable
 import com.local.bulksms.model.RawTable
+import com.local.bulksms.model.columnAddress
 
 class ImportLimitExceeded(
     val actualRows: Int,
@@ -35,12 +36,7 @@ object HeaderDetector {
             throw ImportLimitExceeded(dataRows.size)
         }
 
-        val header = if (firstRowIsHeader) raw.rows.firstOrNull().orEmpty() else emptyList()
-        val names = if (firstRowIsHeader) {
-            uniqueColumnNames(header, width)
-        } else {
-            (0 until width).map { index -> "列${index + 1}" }
-        }
+        val names = (0 until width).map(::columnAddress)
         val columns = names.mapIndexed { index, name -> DynamicColumn(id = index, name = name) }
         val rows = dataRows.mapIndexed { index, cells ->
             DynamicRow(id = index.toLong(), cells = cells.padTo(width))
@@ -51,25 +47,6 @@ object HeaderDetector {
             rows = rows,
             firstRowIsHeader = firstRowIsHeader,
         )
-    }
-
-    private fun uniqueColumnNames(header: List<String>, width: Int): List<String> {
-        val used = mutableSetOf<String>()
-        return (0 until width).map { index ->
-            val suppliedName = header.getOrNull(index).orEmpty().trim()
-            val baseName = suppliedName.ifBlank { "列${index + 1}" }
-            uniqueName(baseName, used)
-        }
-    }
-
-    private fun uniqueName(baseName: String, used: MutableSet<String>): String {
-        if (used.add(baseName)) return baseName
-
-        var suffix = 2
-        while (!used.add("${baseName}_$suffix")) {
-            suffix++
-        }
-        return "${baseName}_$suffix"
     }
 
     private fun List<String>.padTo(width: Int): List<String> {

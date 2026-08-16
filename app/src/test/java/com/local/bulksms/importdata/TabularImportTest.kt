@@ -38,7 +38,7 @@ class TabularImportTest {
         val raw = TabularTextParser.parse("13800138000\t张三\r\n13900139000\t李四")
         val table = HeaderDetector.materialize(raw, firstRowIsHeader = false)
 
-        assertEquals(listOf("列1", "列2"), table.columns.map { it.name })
+        assertEquals(listOf("A", "B"), table.columns.map { it.name })
         assertEquals("13800138000", table.rows.first().cells.first())
         assertEquals(0, PhoneColumnDetector.recommend(table))
     }
@@ -48,7 +48,7 @@ class TabularImportTest {
         val raw = TabularTextParser.parse("姓名\t姓名\t\n张三\tA\t1")
         val table = HeaderDetector.materialize(raw, firstRowIsHeader = true)
 
-        assertEquals(listOf("姓名", "姓名_2", "列3"), table.columns.map { it.name })
+        assertEquals(listOf("A", "B", "C"), table.columns.map { it.name })
     }
 
     @Test
@@ -62,7 +62,7 @@ class TabularImportTest {
 
         val table = HeaderDetector.materialize(raw, firstRowIsHeader = true)
 
-        assertEquals(listOf("列1", "姓名", "姓名_2", "姓名_3"), table.columns.map { it.name })
+        assertEquals(listOf("A", "B", "C", "D"), table.columns.map { it.name })
         assertEquals(listOf("001", "张三", "旧", "新"), table.rows.single().cells)
     }
 
@@ -79,7 +79,7 @@ class TabularImportTest {
         val table = HeaderDetector.materialize(raw, firstRowIsHeader = true)
 
         assertEquals(
-            listOf(DynamicColumn(0, "手机号"), DynamicColumn(1, "姓名")),
+            listOf(DynamicColumn(0, "A"), DynamicColumn(1, "B")),
             table.columns,
         )
         assertEquals(
