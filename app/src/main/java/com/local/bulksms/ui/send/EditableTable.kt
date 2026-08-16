@@ -132,5 +132,5 @@ internal fun contentAwareColumnWidth(values: List<String>): Dp {
     val longestUnits = values.maxOfOrNull { value ->
         value.sumOf { character -> if (character.code > 0xff) 2 else 1 }
     } ?: 1
-    return (longestUnits * 7.2f + 24f).dp.coerceIn(76.dp, 240.dp)
+    return (longestUnits * 8f + 28f).dp.coerceIn(76.dp, 240.dp)
 }

@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
@@ -55,6 +57,7 @@ data class SendWorkbenchCallbacks(
     val onDeleteLastColumn: () -> Unit = {},
     val onClearTable: () -> Unit = {},
     val onTemplateBodyChanged: (String) -> Unit = {},
+    val onTemplateSelected: (String) -> Unit = {},
     val onOverwriteTemplate: () -> Unit = {},
     val onSaveTemplateAs: (String) -> Unit = {},
     val onDraftChanged: (Long, String) -> Unit = { _, _ -> },
@@ -72,6 +75,7 @@ fun SendWorkbenchScreen(
     modifier: Modifier = Modifier,
 ) {
     var tableMenuExpanded by remember { mutableStateOf(false) }
+    var templateMenuExpanded by remember { mutableStateOf(false) }
     var showSaveAsDialog by remember { mutableStateOf(false) }
     var saveAsName by remember { mutableStateOf("") }
     var showSendDialog by remember { mutableStateOf(false) }
@@ -90,6 +94,7 @@ fun SendWorkbenchScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .statusBarsPadding()
                     .height(52.dp)
                     .padding(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -194,13 +199,34 @@ fun SendWorkbenchScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Column {
-                    Text("现场模板", style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        state.selectedTemplateName.ifBlank { "未选择模板" },
-                        color = MaterialTheme.colorScheme.primary,
-                        style = MaterialTheme.typography.labelMedium,
-                    )
+                Box {
+                    OutlinedButton(
+                        onClick = { templateMenuExpanded = true },
+                        modifier = Modifier.testTag("template-selector"),
+                    ) {
+                        Column {
+                            Text("现场模板", style = MaterialTheme.typography.labelSmall)
+                            Text(
+                                state.selectedTemplateName.ifBlank { "未选择模板" },
+                                color = MaterialTheme.colorScheme.primary,
+                                style = MaterialTheme.typography.labelMedium,
+                            )
+                        }
+                    }
+                    DropdownMenu(
+                        expanded = templateMenuExpanded,
+                        onDismissRequest = { templateMenuExpanded = false },
+                    ) {
+                        state.templates.forEach { template ->
+                            DropdownMenuItem(
+                                text = { Text(template.name) },
+                                onClick = {
+                                    templateMenuExpanded = false
+                                    callbacks.onTemplateSelected(template.id)
+                                },
+                            )
+                        }
+                    }
                 }
                 Row {
                     TextButton(onClick = callbacks.onOverwriteTemplate) { Text("覆盖保存") }
@@ -260,6 +286,7 @@ fun SendWorkbenchScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .navigationBarsPadding()
                     .height(72.dp)
                     .padding(horizontal = 10.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),

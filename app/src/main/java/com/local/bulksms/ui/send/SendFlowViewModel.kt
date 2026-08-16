@@ -3,6 +3,7 @@ package com.local.bulksms.ui.send
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.local.bulksms.data.BulkSmsRepository
+import com.local.bulksms.data.TemplateEntity
 import com.local.bulksms.importdata.HeaderDetector
 import com.local.bulksms.importdata.PhoneColumnDetector
 import com.local.bulksms.importdata.TabularTextParser
@@ -39,6 +40,7 @@ data class SendFlowUiState(
     val selectedTemplateId: String? = null,
     val selectedTemplateName: String = "",
     val selectedTemplateBody: String? = null,
+    val templates: List<TemplateEntity> = emptyList(),
     val drafts: List<MessageDraft> = emptyList(),
     val missingTemplateVariables: Set<String> = emptySet(),
     val simOptions: List<SimOption> = emptyList(),
@@ -74,6 +76,11 @@ class SendFlowViewModel(
                     drafts = restoredDrafts.ifEmpty { restored.drafts },
                 )
                 if (restoredDrafts.isEmpty()) schedulePersistence(mutableState.value)
+            }
+            viewModelScope.launch {
+                targetRepository.templateDao.observeAll().collect { templates ->
+                    mutableState.value = mutableState.value.copy(templates = templates)
+                }
             }
         }
     }
@@ -147,6 +154,53 @@ class SendFlowViewModel(
                     ?.let { "模板包含不存在的变量：${it.joinToString("、")}" },
             )
         }
+    }
+
+    fun selectTemplate(templateId: String) {
+        val template = mutableState.value.templates.firstOrNull { it.id == templateId } ?: return
+        selectTemplate(template.id, template.body, template.name)
+    }
+
+    fun overwriteSelectedTemplate() {
+        val current = mutableState.value
+        val body = current.selectedTemplateBody.orEmpty()
+        val existing = current.templates.firstOrNull { it.id == current.selectedTemplateId }
+        if (existing == null || body.isBlank()) {
+            updateState { it.copy(blockingError = "请先选择模板并填写正文") }
+            return
+        }
+        val updated = existing.copy(
+            name = current.selectedTemplateName.ifBlank { existing.name },
+            body = body,
+            updatedAt = System.currentTimeMillis(),
+        )
+        updateState { it.copy(blockingError = null) }
+        repository?.let { target -> viewModelScope.launch { target.templateDao.upsert(updated) } }
+    }
+
+    fun saveSelectedTemplateAs(name: String) {
+        val current = mutableState.value
+        val body = current.selectedTemplateBody.orEmpty()
+        if (name.isBlank() || body.isBlank()) {
+            updateState { it.copy(blockingError = "模板名称和正文不能为空") }
+            return
+        }
+        val now = System.currentTimeMillis()
+        val created = TemplateEntity(
+            id = idFactory(),
+            name = name.trim(),
+            body = body,
+            createdAt = now,
+            updatedAt = now,
+        )
+        updateState {
+            it.copy(
+                selectedTemplateId = created.id,
+                selectedTemplateName = created.name,
+                blockingError = null,
+            )
+        }
+        repository?.let { target -> viewModelScope.launch { target.templateDao.upsert(created) } }
     }
 
     fun updateTemplateBody(body: String) {

@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -28,7 +29,8 @@ class TemplateScreenTest {
                     onStartNew = {},
                     onNameChanged = {},
                     onBodyChanged = { body = it },
-                    onSave = {},
+                    onOverwrite = {},
+                    onSaveAs = {},
                     onDelete = {},
                 )
             }
@@ -37,5 +39,37 @@ class TemplateScreenTest {
         composeRule.onNodeWithTag("variable-姓名").performClick()
 
         assertEquals("您好{姓名}", body)
+    }
+
+    @Test
+    fun overwriteAndSaveAsAreSeparateActions() {
+        var overwriteCount = 0
+        var savedAsName: String? = null
+
+        composeRule.setContent {
+            MaterialTheme {
+                TemplateScreen(
+                    state = TemplateUiState(
+                        selectedTemplateId = "existing",
+                        editorName = "续期提醒副本",
+                        editorBody = "正文",
+                    ),
+                    availableVariables = emptyList(),
+                    onSelect = {},
+                    onStartNew = {},
+                    onNameChanged = {},
+                    onBodyChanged = {},
+                    onOverwrite = { overwriteCount++ },
+                    onSaveAs = { savedAsName = it },
+                    onDelete = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("覆盖保存").performClick()
+        composeRule.onNodeWithText("另存为").performClick()
+
+        assertEquals(1, overwriteCount)
+        assertEquals("续期提醒副本", savedAsName)
     }
 }

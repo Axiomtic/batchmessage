@@ -33,8 +33,10 @@ fun TemplateScreen(
     onStartNew: () -> Unit,
     onNameChanged: (String) -> Unit,
     onBodyChanged: (String) -> Unit,
-    onSave: () -> Unit,
+    onOverwrite: () -> Unit,
+    onSaveAs: (String) -> Unit,
     onDelete: (String) -> Unit,
+    onBack: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     var bodyValue by remember {
@@ -61,7 +63,10 @@ fun TemplateScreen(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            Text("短信模板", style = MaterialTheme.typography.headlineSmall)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                onBack?.let { back -> OutlinedButton(onClick = back) { Text("返回") } }
+                Text("短信模板", style = MaterialTheme.typography.headlineSmall)
+            }
             OutlinedButton(onClick = onStartNew) { Text("新建") }
         }
         Row(
@@ -121,7 +126,14 @@ fun TemplateScreen(
         }
         state.validationError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Button(onClick = onSave) { Text("保存模板") }
+            Button(
+                onClick = onOverwrite,
+                enabled = state.selectedTemplateId != null,
+            ) { Text("覆盖保存") }
+            OutlinedButton(
+                onClick = { onSaveAs(state.editorName) },
+                enabled = state.editorName.isNotBlank() && state.editorBody.isNotBlank(),
+            ) { Text("另存为") }
             state.selectedTemplateId?.let { selectedId ->
                 OutlinedButton(onClick = { onDelete(selectedId) }) { Text("删除") }
             }

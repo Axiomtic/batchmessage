@@ -8,7 +8,9 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import com.local.bulksms.data.TemplateEntity
 import com.local.bulksms.model.RawTable
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -64,5 +66,32 @@ class SendWorkbenchScreenTest {
 
         assertTrue(cancelled)
         assertTrue(!confirmed)
+    }
+
+    @Test
+    fun inlineTemplateSelectorChoosesSavedTemplate() {
+        var selectedId: String? = null
+        val state = SendFlowViewModel().state.value.copy(
+            templates = listOf(
+                TemplateEntity("default", "服务到期提醒", "默认正文"),
+                TemplateEntity("renewal", "续费提醒", "续费正文"),
+            ),
+        )
+
+        composeRule.setContent {
+            MaterialTheme {
+                SendWorkbenchScreen(
+                    state = state,
+                    callbacks = SendWorkbenchCallbacks(
+                        onTemplateSelected = { selectedId = it },
+                    ),
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("template-selector").performClick()
+        composeRule.onNodeWithText("续费提醒").performClick()
+
+        assertEquals("renewal", selectedId)
     }
 }

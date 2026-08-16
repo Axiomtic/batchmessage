@@ -90,6 +90,51 @@ class TemplateViewModel(
         workScope.launch { saveTemplate(template) }
     }
 
+    fun overwrite() {
+        val current = mutableState.value
+        val existing = current.templates.firstOrNull { it.id == current.selectedTemplateId }
+        if (existing == null) {
+            mutableState.update { it.copy(validationError = "请先选择要覆盖的模板") }
+            return
+        }
+        if (current.editorName.isBlank() || current.editorBody.isBlank()) {
+            mutableState.update { it.copy(validationError = "模板名称和正文不能为空") }
+            return
+        }
+        val updated = existing.copy(
+            name = current.editorName.trim(),
+            body = current.editorBody,
+            updatedAt = clock(),
+        )
+        mutableState.update { it.copy(validationError = null) }
+        workScope.launch { saveTemplate(updated) }
+    }
+
+    fun saveAs(name: String): String? {
+        val current = mutableState.value
+        if (name.isBlank() || current.editorBody.isBlank()) {
+            mutableState.update { it.copy(validationError = "模板名称和正文不能为空") }
+            return null
+        }
+        val now = clock()
+        val created = TemplateEntity(
+            id = idFactory(),
+            name = name.trim(),
+            body = current.editorBody,
+            createdAt = now,
+            updatedAt = now,
+        )
+        mutableState.update {
+            it.copy(
+                selectedTemplateId = created.id,
+                editorName = created.name,
+                validationError = null,
+            )
+        }
+        workScope.launch { saveTemplate(created) }
+        return created.id
+    }
+
     fun delete(id: String) {
         mutableState.update { current ->
             if (current.selectedTemplateId == id) {

@@ -12,6 +12,35 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class TemplateViewModelTest {
     @Test
+    fun overwriteKeepsIdWhileSaveAsCreatesNewId() = runTest {
+        val existing = TemplateEntity("existing", "到期提醒", "旧正文", createdAt = 10L, updatedAt = 10L)
+        val templates = MutableStateFlow(listOf(existing))
+        val saved = mutableListOf<TemplateEntity>()
+        val viewModel = TemplateViewModel(
+            templates = templates,
+            saveTemplate = { saved += it },
+            deleteTemplate = {},
+            scope = backgroundScope,
+            idFactory = { "generated-new-id" },
+            clock = { 20L },
+        )
+        runCurrent()
+        viewModel.selectTemplate(existing.id)
+        viewModel.setEditorBody("修改正文")
+
+        viewModel.overwrite()
+        val savedAsId = viewModel.saveAs("新的到期提醒")
+        runCurrent()
+
+        assertEquals(listOf("existing", "generated-new-id"), saved.map { it.id })
+        assertEquals(10L, saved.first().createdAt)
+        assertEquals("新的到期提醒", saved.last().name)
+        assertEquals("修改正文", saved.last().body)
+        assertEquals("generated-new-id", viewModel.state.value.selectedTemplateId)
+        assertEquals("generated-new-id", savedAsId)
+    }
+
+    @Test
     fun savingNewTemplatePersistsEditorValuesAndSelectsIt() = runTest {
         val templates = MutableStateFlow(emptyList<TemplateEntity>())
         val saved = mutableListOf<TemplateEntity>()
