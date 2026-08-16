@@ -45,6 +45,15 @@ interface ImportDao {
 }
 
 @Dao
+interface WorkspaceDao {
+    @Query("SELECT * FROM workspace WHERE id = 'current'")
+    suspend fun current(): WorkspaceEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(workspace: WorkspaceEntity)
+}
+
+@Dao
 interface DraftDao {
     @Query("SELECT * FROM message_drafts WHERE importId = :importId ORDER BY rowId, id")
     fun byImport(importId: String): Flow<List<MessageDraftEntity>>

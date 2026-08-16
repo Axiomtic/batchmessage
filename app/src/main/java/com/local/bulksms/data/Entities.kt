@@ -6,7 +6,9 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.local.bulksms.model.MessageDraft
 import com.local.bulksms.model.SendStatus
+import com.local.bulksms.model.WorkspaceSnapshot
 import java.util.UUID
+import org.json.JSONArray
 
 @Entity(tableName = "templates")
 data class TemplateEntity(
@@ -30,6 +32,65 @@ data class ImportTaskEntity(
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = createdAt,
 )
+
+@Entity(tableName = "workspace")
+data class WorkspaceEntity(
+    @PrimaryKey val id: String = CURRENT_ID,
+    val importId: String,
+    val rawRowsJson: String,
+    val detectedHeader: Boolean,
+    val firstRowIsHeader: Boolean,
+    val phoneColumnIndex: Int?,
+    val selectedTemplateId: String?,
+    val selectedTemplateName: String,
+    val selectedTemplateBody: String,
+    val selectedSubscriptionId: Int?,
+    val updatedAt: Long = System.currentTimeMillis(),
+) {
+    fun toSnapshot(): WorkspaceSnapshot = WorkspaceSnapshot(
+        importId = importId,
+        rawRows = decodeRows(rawRowsJson),
+        detectedHeader = detectedHeader,
+        firstRowIsHeader = firstRowIsHeader,
+        phoneColumnIndex = phoneColumnIndex,
+        selectedTemplateId = selectedTemplateId,
+        selectedTemplateName = selectedTemplateName,
+        selectedTemplateBody = selectedTemplateBody,
+        selectedSubscriptionId = selectedSubscriptionId,
+    )
+
+    companion object {
+        const val CURRENT_ID = "current"
+
+        fun fromSnapshot(snapshot: WorkspaceSnapshot, updatedAt: Long = System.currentTimeMillis()) =
+            WorkspaceEntity(
+                importId = snapshot.importId,
+                rawRowsJson = encodeRows(snapshot.rawRows),
+                detectedHeader = snapshot.detectedHeader,
+                firstRowIsHeader = snapshot.firstRowIsHeader,
+                phoneColumnIndex = snapshot.phoneColumnIndex,
+                selectedTemplateId = snapshot.selectedTemplateId,
+                selectedTemplateName = snapshot.selectedTemplateName,
+                selectedTemplateBody = snapshot.selectedTemplateBody,
+                selectedSubscriptionId = snapshot.selectedSubscriptionId,
+                updatedAt = updatedAt,
+            )
+
+        private fun encodeRows(rows: List<List<String>>): String = JSONArray().apply {
+            rows.forEach { row ->
+                put(JSONArray().apply { row.forEach(::put) })
+            }
+        }.toString()
+
+        private fun decodeRows(json: String): List<List<String>> {
+            val rows = JSONArray(json)
+            return List(rows.length()) { rowIndex ->
+                val row = rows.getJSONArray(rowIndex)
+                List(row.length()) { columnIndex -> row.getString(columnIndex) }
+            }
+        }
+    }
+}
 
 @Entity(
     tableName = "message_drafts",

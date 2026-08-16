@@ -4,6 +4,7 @@ import androidx.room.withTransaction
 import com.local.bulksms.model.MessageDraft
 import com.local.bulksms.model.SendAttemptResult
 import com.local.bulksms.model.SendStatus
+import com.local.bulksms.model.WorkspaceSnapshot
 import java.util.UUID
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -22,12 +23,40 @@ class BulkSmsRepository(
     val draftDao: DraftDao
         get() = database.draftDao()
 
+    val workspaceDao: WorkspaceDao
+        get() = database.workspaceDao()
+
     val sendDao: SendDao
         get() = database.sendDao()
 
     suspend fun saveImport(task: ImportTaskEntity) {
         database.importDao().upsert(task)
     }
+
+    suspend fun loadOrCreateWorkspace(): WorkspaceSnapshot = database.withTransaction {
+        database.workspaceDao().current()?.toSnapshot()?.let { return@withTransaction it }
+
+        val workspace = WorkspaceSnapshot.sample()
+        val now = clock()
+        database.templateDao().upsert(
+            TemplateEntity(
+                id = WorkspaceSnapshot.DEFAULT_TEMPLATE_ID,
+                name = WorkspaceSnapshot.DEFAULT_TEMPLATE_NAME,
+                body = WorkspaceSnapshot.DEFAULT_TEMPLATE_BODY,
+                createdAt = now,
+                updatedAt = now,
+            ),
+        )
+        database.workspaceDao().upsert(WorkspaceEntity.fromSnapshot(workspace, now))
+        workspace
+    }
+
+    suspend fun saveWorkspace(snapshot: WorkspaceSnapshot) {
+        database.workspaceDao().upsert(WorkspaceEntity.fromSnapshot(snapshot, clock()))
+    }
+
+    suspend fun loadDraftsOnce(importId: String): List<MessageDraft> =
+        database.draftDao().byImportOnce(importId).map(MessageDraftEntity::toMessageDraft)
 
     suspend fun saveDraft(importId: String, draft: MessageDraft) {
         database.draftDao().upsert(MessageDraftEntity.fromDraft(importId, draft))

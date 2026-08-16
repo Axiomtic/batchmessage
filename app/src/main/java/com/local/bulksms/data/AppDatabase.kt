@@ -6,6 +6,8 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverter
 import androidx.room.TypeConverters
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import com.local.bulksms.model.SendStatus
 import org.json.JSONArray
 
@@ -30,12 +32,13 @@ class AppTypeConverters {
     entities = [
         TemplateEntity::class,
         ImportTaskEntity::class,
+        WorkspaceEntity::class,
         MessageDraftEntity::class,
         SendTaskEntity::class,
         SendItemEntity::class,
         SendAttemptEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = true,
 )
 @TypeConverters(AppTypeConverters::class)
@@ -44,6 +47,8 @@ abstract class AppDatabase : RoomDatabase() {
 
     abstract fun importDao(): ImportDao
 
+    abstract fun workspaceDao(): WorkspaceDao
+
     abstract fun draftDao(): DraftDao
 
     abstract fun sendDao(): SendDao
@@ -51,10 +56,33 @@ abstract class AppDatabase : RoomDatabase() {
     companion object {
         const val DATABASE_NAME = "bulk_sms.db"
 
+        val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `workspace` (
+                        `id` TEXT NOT NULL,
+                        `importId` TEXT NOT NULL,
+                        `rawRowsJson` TEXT NOT NULL,
+                        `detectedHeader` INTEGER NOT NULL,
+                        `firstRowIsHeader` INTEGER NOT NULL,
+                        `phoneColumnIndex` INTEGER,
+                        `selectedTemplateId` TEXT,
+                        `selectedTemplateName` TEXT NOT NULL,
+                        `selectedTemplateBody` TEXT NOT NULL,
+                        `selectedSubscriptionId` INTEGER,
+                        `updatedAt` INTEGER NOT NULL,
+                        PRIMARY KEY(`id`)
+                    )
+                    """.trimIndent(),
+                )
+            }
+        }
+
         fun create(context: Context): AppDatabase = Room.databaseBuilder(
             context.applicationContext,
             AppDatabase::class.java,
             DATABASE_NAME,
-        ).build()
+        ).addMigrations(MIGRATION_1_2).build()
     }
 }
