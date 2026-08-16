@@ -11,20 +11,13 @@ class MainActivityTest {
     val composeRule = createAndroidComposeRule<MainActivity>()
 
     @Test
-    fun launchShowsFixedWorkbenchInsteadOfLegacyImportScreen() {
-        composeRule.onNodeWithText("数据表格").assertExists()
-        composeRule.onNodeWithText("现场模板").assertExists()
-        composeRule.onNodeWithText("待发送短信", substring = true).assertExists()
-        composeRule.onNodeWithText("确认并发送").assertExists()
-        composeRule.onNodeWithText("导入数据").assertDoesNotExist()
-    }
+    fun launchStartsOnDataAndBottomNavigationOpensEveryPage() {
+        composeRule.onNodeWithText("导入数据").assertExists()
 
-    @Test
-    fun templateManagerOpensAndReturnsToWorkbench() {
-        composeRule.onNodeWithText("模板管理").performClick()
-        composeRule.onNodeWithText("短信模板").assertExists()
+        composeRule.onNodeWithText("短信").performClick()
+        composeRule.onNodeWithText("短信预览").assertExists()
 
-        composeRule.onNodeWithText("返回").performClick()
-        composeRule.onNodeWithText("数据表格").assertExists()
+        composeRule.onNodeWithText("设置").performClick()
+        composeRule.onNodeWithText("忽略首行").assertExists()
     }
 }
