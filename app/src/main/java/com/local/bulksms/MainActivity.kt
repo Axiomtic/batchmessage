@@ -33,6 +33,19 @@ class MainActivity : ComponentActivity() {
                 LaunchedEffect(Unit) {
                     sendFlowViewModel.setSimOptions(SimSubscriptionProvider(this@MainActivity).active())
                 }
+                LaunchedEffect(
+                    templateState.templates,
+                    templateState.selectedTemplateId,
+                    sendState.selectedTemplateId,
+                ) {
+                    if (templateState.selectedTemplateId == null && templateState.templates.isNotEmpty()) {
+                        val target = templateState.templates.firstOrNull {
+                            it.id == sendState.selectedTemplateId
+                        } ?: templateState.templates.first()
+                        templateViewModel.selectTemplate(target.id)
+                        sendFlowViewModel.selectTemplate(target.id, target.body, target.name)
+                    }
+                }
 
                 BulkSmsApp(
                     sendState = sendState,
@@ -61,6 +74,23 @@ class MainActivity : ComponentActivity() {
                         onTemplateBodyChanged = { body ->
                             templateViewModel.setEditorBody(body)
                             sendFlowViewModel.updateTemplateBody(body)
+                        },
+                        onCreateTemplate = { name ->
+                            templateViewModel.create(name)?.let { created ->
+                                sendFlowViewModel.selectTemplate(created.id, created.body, created.name)
+                            }
+                        },
+                        onSaveTemplate = {
+                            templateViewModel.saveSelected()?.let { saved ->
+                                sendFlowViewModel.selectTemplate(saved.id, saved.body, saved.name)
+                            }
+                        },
+                        onDeleteTemplate = {
+                            templateViewModel.deleteSelected()?.let { nextId ->
+                                templateState.templates.firstOrNull { it.id == nextId }?.let { next ->
+                                    sendFlowViewModel.selectTemplate(next.id, next.body, next.name)
+                                }
+                            }
                         },
                     ),
                 )

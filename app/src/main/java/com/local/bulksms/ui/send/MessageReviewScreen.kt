@@ -19,6 +19,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.local.bulksms.model.MessageDraft
@@ -106,7 +107,7 @@ fun MessageReviewItem(
             )
             Row(
                 modifier = Modifier
-                    .semantics(mergeDescendants = true) {}
+                    .semantics { contentDescription = "与表同步" }
                     .toggleable(
                         value = draft.syncWithTable,
                         role = Role.Checkbox,
@@ -115,7 +116,6 @@ fun MessageReviewItem(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Checkbox(checked = draft.syncWithTable, onCheckedChange = null)
-                Text("与表同步")
             }
         }
     }

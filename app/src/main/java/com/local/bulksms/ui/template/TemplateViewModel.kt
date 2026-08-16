@@ -18,8 +18,11 @@ data class TemplateUiState(
     val selectedTemplateId: String? = null,
     val editorName: String = "",
     val editorBody: String = "",
+    val savedBody: String = "",
     val validationError: String? = null,
-)
+) {
+    val isDirty: Boolean get() = editorBody != savedBody
+}
 
 class TemplateViewModel(
     templates: Flow<List<TemplateEntity>>,
@@ -48,6 +51,7 @@ class TemplateViewModel(
                 selectedTemplateId = id,
                 editorName = template?.name.orEmpty(),
                 editorBody = template?.body.orEmpty(),
+                savedBody = template?.body.orEmpty(),
             )
         }
     }
@@ -58,6 +62,7 @@ class TemplateViewModel(
                 selectedTemplateId = null,
                 editorName = "",
                 editorBody = "",
+                savedBody = "",
                 validationError = null,
             )
         }
@@ -86,8 +91,71 @@ class TemplateViewModel(
             createdAt = existing?.createdAt ?: now,
             updatedAt = now,
         )
-        mutableState.update { it.copy(selectedTemplateId = template.id, validationError = null) }
+        mutableState.update {
+            it.copy(selectedTemplateId = template.id, savedBody = template.body, validationError = null)
+        }
         workScope.launch { saveTemplate(template) }
+    }
+
+    fun create(name: String): TemplateEntity? {
+        if (name.isBlank()) {
+            mutableState.update { it.copy(validationError = "模板名称不能为空") }
+            return null
+        }
+        val now = clock()
+        val created = TemplateEntity(
+            id = idFactory(),
+            name = name.trim(),
+            body = "",
+            createdAt = now,
+            updatedAt = now,
+        )
+        mutableState.update {
+            it.copy(
+                selectedTemplateId = created.id,
+                editorName = created.name,
+                editorBody = "",
+                savedBody = "",
+                validationError = null,
+            )
+        }
+        workScope.launch { saveTemplate(created) }
+        return created
+    }
+
+    fun saveSelected(): TemplateEntity? {
+        val current = mutableState.value
+        val existing = current.templates.firstOrNull { it.id == current.selectedTemplateId }
+        if (existing == null || current.editorBody.isBlank()) {
+            mutableState.update { it.copy(validationError = "模板正文不能为空") }
+            return null
+        }
+        val updated = existing.copy(
+            name = current.editorName.ifBlank { existing.name }.trim(),
+            body = current.editorBody,
+            updatedAt = clock(),
+        )
+        mutableState.update { it.copy(savedBody = updated.body, validationError = null) }
+        workScope.launch { saveTemplate(updated) }
+        return updated
+    }
+
+    fun deleteSelected(): String? {
+        val current = mutableState.value
+        if (current.templates.size <= 1) return null
+        val selectedId = current.selectedTemplateId ?: return null
+        val next = current.templates.firstOrNull { it.id != selectedId } ?: return null
+        mutableState.update {
+            it.copy(
+                selectedTemplateId = next.id,
+                editorName = next.name,
+                editorBody = next.body,
+                savedBody = next.body,
+                validationError = null,
+            )
+        }
+        workScope.launch { deleteTemplate(selectedId) }
+        return next.id
     }
 
     fun overwrite() {
@@ -106,7 +174,7 @@ class TemplateViewModel(
             body = current.editorBody,
             updatedAt = clock(),
         )
-        mutableState.update { it.copy(validationError = null) }
+        mutableState.update { it.copy(savedBody = updated.body, validationError = null) }
         workScope.launch { saveTemplate(updated) }
     }
 
@@ -128,6 +196,7 @@ class TemplateViewModel(
             it.copy(
                 selectedTemplateId = created.id,
                 editorName = created.name,
+                savedBody = created.body,
                 validationError = null,
             )
         }
@@ -138,7 +207,12 @@ class TemplateViewModel(
     fun delete(id: String) {
         mutableState.update { current ->
             if (current.selectedTemplateId == id) {
-                current.copy(selectedTemplateId = null, editorName = "", editorBody = "")
+                current.copy(
+                    selectedTemplateId = null,
+                    editorName = "",
+                    editorBody = "",
+                    savedBody = "",
+                )
             } else {
                 current
             }
