@@ -144,4 +144,29 @@ class SendFlowViewModelTest {
         assertEquals("手机号", state.table?.rows?.first()?.cells?.first())
         assertEquals(2, state.rawTable?.rows?.size)
     }
+
+    @Test
+    fun deletingSpecificRowKeepsOtherRowsAndUnsyncedDraft() {
+        val viewModel = SendFlowViewModel()
+        viewModel.editDraft(1L, "保留李四")
+
+        viewModel.deleteRow(0L)
+
+        assertEquals(listOf("李四", "", "", ""), viewModel.state.value.table?.rows?.map { it.cells[0] })
+        assertEquals(
+            "保留李四",
+            viewModel.state.value.drafts.first { !it.syncWithTable }.currentBody,
+        )
+    }
+
+    @Test
+    fun deletingPhoneColumnClearsPhoneSelection() {
+        val viewModel = SendFlowViewModel()
+
+        viewModel.deleteColumn(1)
+
+        assertEquals(listOf("A", "B"), viewModel.state.value.table?.columns?.map { it.name })
+        assertNull(viewModel.state.value.selectedPhoneColumn)
+        assertNull(viewModel.state.value.table?.phoneColumnIndex)
+    }
 }

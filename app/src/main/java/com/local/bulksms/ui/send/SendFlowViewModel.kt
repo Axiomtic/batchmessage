@@ -332,6 +332,37 @@ class SendFlowViewModel(
         if (table.columns.size > 1) rematerializeCurrent(raw.copy(rows = raw.rows.map { it.dropLast(1) }))
     }
 
+    fun deleteRow(rowId: Long) {
+        val current = mutableState.value
+        val raw = current.rawTable ?: return
+        val table = current.table ?: return
+        if (table.rows.size <= 1) return
+        val rawIndex = rowId.toInt() + if (table.firstRowIsHeader) 1 else 0
+        if (rawIndex !in raw.rows.indices) return
+        rematerializeCurrent(
+            raw.copy(rows = raw.rows.filterIndexed { index, _ -> index != rawIndex }),
+        )
+    }
+
+    fun deleteColumn(columnIndex: Int) {
+        val current = mutableState.value
+        val raw = current.rawTable ?: return
+        val table = current.table ?: return
+        if (table.columns.size <= 1 || columnIndex !in table.columns.indices) return
+        val adjustedPhoneColumn = when (val selected = current.selectedPhoneColumn) {
+            null -> null
+            columnIndex -> null
+            in (columnIndex + 1)..Int.MAX_VALUE -> selected - 1
+            else -> selected
+        }
+        val updatedRaw = raw.copy(
+            rows = raw.rows.map { row ->
+                row.padTo(table.columns.size).filterIndexed { index, _ -> index != columnIndex }
+            },
+        )
+        rematerializeCurrent(updatedRaw, adjustedPhoneColumn)
+    }
+
     fun clearTable() {
         val current = mutableState.value
         val raw = current.rawTable ?: return
@@ -400,12 +431,15 @@ class SendFlowViewModel(
         )
     }
 
-    private fun rematerializeCurrent(updatedRaw: RawTable) {
+    private fun rematerializeCurrent(
+        updatedRaw: RawTable,
+        selectedPhoneColumn: Int? = mutableState.value.selectedPhoneColumn,
+    ) {
         val current = mutableState.value
         val firstRowIsHeader = current.table?.firstRowIsHeader ?: current.detectedHeader
         runCatching { HeaderDetector.materialize(updatedRaw, firstRowIsHeader) }.fold(
             onSuccess = { materialized ->
-                val selectedPhone = current.selectedPhoneColumn?.takeIf { it in materialized.columns.indices }
+                val selectedPhone = selectedPhoneColumn?.takeIf { it in materialized.columns.indices }
                 val table = materialized.copy(phoneColumnIndex = selectedPhone)
                 updateState {
                     current.copy(
