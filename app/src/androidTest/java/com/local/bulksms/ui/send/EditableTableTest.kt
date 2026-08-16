@@ -1,6 +1,9 @@
 package com.local.bulksms.ui.send
 
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.assert
@@ -67,11 +70,11 @@ class EditableTableTest {
 
     @Test
     fun cellIsEditableAndColumnHeaderSelectsPhoneColumn() {
-        val table = ImportedTable(
+        var table by mutableStateOf(ImportedTable(
             columns = listOf(DynamicColumn(0, "手机号"), DynamicColumn(1, "姓名")),
             rows = listOf(DynamicRow(7L, listOf("13800138000", "张三"))),
             firstRowIsHeader = true,
-        )
+        ))
         var lastEdit: CellEdit? = null
         var selectedPhoneColumn: Int? = null
 
@@ -79,7 +82,16 @@ class EditableTableTest {
             MaterialTheme {
                 EditableTable(
                     table = table,
-                    onCellChanged = { lastEdit = it },
+                    onCellChanged = { edit ->
+                        lastEdit = edit
+                        table = table.copy(rows = table.rows.map { row ->
+                            if (row.id != edit.rowId) row else row.copy(
+                                cells = row.cells.toMutableList().also { cells ->
+                                    cells[edit.columnIndex] = edit.value
+                                },
+                            )
+                        })
+                    },
                     onPhoneColumnSelected = { selectedPhoneColumn = it },
                 )
             }

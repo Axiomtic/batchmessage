@@ -6,6 +6,24 @@ import org.junit.Test
 
 class SendFlowViewModelTest {
     @Test
+    fun manualDraftEditIsProtectedUntilSyncIsReenabled() {
+        val viewModel = SendFlowViewModel()
+        viewModel.importClipboard("手机号\t姓名\t金额\n13800138000\t张三\t100")
+        viewModel.selectTemplate("template-1", "{姓名}您好，金额{金额}")
+
+        viewModel.editDraft(0L, "张三您好，已延期")
+        viewModel.editCell(0L, 2, "200")
+
+        assertEquals(false, viewModel.state.value.drafts.single().syncWithTable)
+        assertEquals("张三您好，已延期", viewModel.state.value.drafts.single().currentBody)
+
+        viewModel.setDraftSynced(0L, true)
+
+        assertEquals(true, viewModel.state.value.drafts.single().syncWithTable)
+        assertEquals("张三您好，金额200", viewModel.state.value.drafts.single().currentBody)
+    }
+
+    @Test
     fun selectingPhoneColumnOverridesRecommendation() {
         val viewModel = SendFlowViewModel()
         viewModel.importClipboard("13800138000\t13900139000\n13700137000\t13600136000")

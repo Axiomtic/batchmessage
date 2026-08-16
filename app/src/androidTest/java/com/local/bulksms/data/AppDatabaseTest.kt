@@ -35,6 +35,23 @@ class AppDatabaseTest {
     }
 
     @Test
+    fun savingDraftListReplacesRowsRemovedByTableRefresh() = runTest {
+        fun draft(rowId: Long) = MessageDraft(
+            rowId = rowId,
+            phoneNumber = "13800138000",
+            generatedBody = "正文$rowId",
+            currentBody = "正文$rowId",
+            columnNames = listOf("手机号"),
+            phoneColumnIndex = 0,
+        )
+        repository.saveDrafts("import-1", listOf(draft(1L), draft(2L)))
+
+        repository.saveDrafts("import-1", listOf(draft(1L)))
+
+        assertEquals(listOf(1L), database.draftDao().byImportOnce("import-1").map { it.rowId })
+    }
+
+    @Test
     fun messageDraftRoundTripPreservesRenderingContext() = runTest {
         val draft = MessageDraft(
             rowId = 10L,

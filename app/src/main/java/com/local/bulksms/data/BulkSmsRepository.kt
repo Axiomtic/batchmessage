@@ -35,6 +35,7 @@ class BulkSmsRepository(
 
     suspend fun saveDrafts(importId: String, drafts: List<MessageDraft>) {
         database.withTransaction {
+            database.draftDao().deleteByImport(importId)
             database.draftDao().upsertAll(drafts.map { MessageDraftEntity.fromDraft(importId, it) })
         }
     }
