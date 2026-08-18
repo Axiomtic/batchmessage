@@ -222,7 +222,7 @@ class SmsScreenTest {
         }
 
         composeRule.onNodeWithText("需授权读取 SIM").assertExists()
-        composeRule.onNodeWithTag("grant-sim-permission").performClick()
+        composeRule.onNodeWithTag("sim-menu-button").performClick()
         composeRule.runOnIdle { assertEquals(true, permissionRequested) }
     }
 

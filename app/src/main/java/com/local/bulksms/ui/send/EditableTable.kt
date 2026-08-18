@@ -86,14 +86,16 @@ fun EditableTable(
             Row {
                 AxisCell("", 36.dp, headerColor)
                 table.columns.forEachIndexed { index, column ->
+                    val (background, textColor) = columnHeaderColors(
+                        index = index,
+                        phoneColumnIndex = table.phoneColumnIndex,
+                        backupPhoneColumnIndex = table.backupPhoneColumnIndex,
+                    )
                     AxisCell(
                         text = column.name,
                         width = columnWidths[index],
-                        background = columnHeaderColor(
-                            index = index,
-                            phoneColumnIndex = table.phoneColumnIndex,
-                            backupPhoneColumnIndex = table.backupPhoneColumnIndex,
-                        ),
+                        background = background,
+                        textColor = textColor,
                         modifier = Modifier
                             .combinedClickable(
                                 onClick = { onColumnHeaderClicked(index) },
@@ -167,16 +169,21 @@ fun EditableTable(
     }
 }
 
-/** Header background signals the phone-column role instead of a text badge. */
+/**
+ * Header colors signal the phone-column role: both roles use the app's teal-green
+ * theme colors, the primary role with a solid fill and the backup with a light one.
+ */
 @Composable
-private fun columnHeaderColor(
+private fun columnHeaderColors(
     index: Int,
     phoneColumnIndex: Int?,
     backupPhoneColumnIndex: Int?,
-): Color = when (index) {
-    phoneColumnIndex -> MaterialTheme.colorScheme.primaryContainer
-    backupPhoneColumnIndex -> MaterialTheme.colorScheme.secondaryContainer
-    else -> MaterialTheme.colorScheme.surfaceVariant
+): Pair<Color, Color> = when (index) {
+    phoneColumnIndex -> MaterialTheme.colorScheme.primary to MaterialTheme.colorScheme.onPrimary
+    backupPhoneColumnIndex -> {
+        MaterialTheme.colorScheme.primaryContainer to MaterialTheme.colorScheme.onPrimaryContainer
+    }
+    else -> MaterialTheme.colorScheme.surfaceVariant to MaterialTheme.colorScheme.onSurface
 }
 
 @Composable
@@ -191,6 +198,7 @@ private fun AxisCell(
     text: String,
     width: Dp,
     background: Color,
+    textColor: Color = MaterialTheme.colorScheme.onSurface,
     modifier: Modifier = Modifier,
 ) {
     Box(
@@ -205,6 +213,7 @@ private fun AxisCell(
             text,
             style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.SemiBold,
+            color = textColor,
         )
     }
 }
