@@ -126,8 +126,9 @@ data class MessageDraftEntity(
         syncWithTable = syncWithTable,
         manuallyEdited = manuallyEdited,
         columnNames = columnNames,
-        phoneColumnIndex = phoneColumnIndex,
-        backupPhoneColumnIndex = backupPhoneColumnIndex,
+        phoneColumnIndex = phoneColumnIndex?.takeIf { it in columnNames.indices },
+        backupPhoneColumnIndex = backupPhoneColumnIndex
+            ?.takeIf { it in columnNames.indices && it != phoneColumnIndex },
     )
 
     companion object {

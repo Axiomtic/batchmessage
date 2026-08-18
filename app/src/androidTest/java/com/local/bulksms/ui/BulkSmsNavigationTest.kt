@@ -2,7 +2,7 @@ package com.local.bulksms.ui
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import com.local.bulksms.ui.send.SendFlowViewModel
 import com.local.bulksms.ui.template.TemplateUiState
 import org.junit.Rule
@@ -24,8 +24,8 @@ class BulkSmsNavigationTest {
             }
         }
 
-        composeRule.onNodeWithContentDescription("数据图标").assertExists()
-        composeRule.onNodeWithContentDescription("发送图标").assertExists()
-        composeRule.onNodeWithContentDescription("设置图标").assertExists()
+        composeRule.onNodeWithTag("nav-data").assertExists()
+        composeRule.onNodeWithTag("nav-sms").assertExists()
+        composeRule.onNodeWithTag("nav-settings").assertExists()
     }
 }

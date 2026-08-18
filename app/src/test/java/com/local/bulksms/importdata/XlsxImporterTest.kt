@@ -245,13 +245,14 @@ class XlsxImporterTest {
             workbookXmlOverride = workbookXml,
         )
 
+        // External entity references are still refused as part of the XXE hardening.
         assertThrows(IllegalArgumentException::class.java) {
             XlsxImporter().import(bytes.inputStream())
         }
     }
 
     @Test
-    fun rejectsInternalEntityExpansionDeclarations() {
+    fun toleratesHarmlessInternalEntityDeclarations() {
         val workbookXml = """
             <!DOCTYPE workbook [<!ENTITY boom "expanded">]>
             <workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
@@ -264,9 +265,10 @@ class XlsxImporterTest {
             workbookXmlOverride = workbookXml,
         )
 
-        assertThrows(IllegalArgumentException::class.java) {
-            XlsxImporter().import(bytes.inputStream())
-        }
+        // A harmless internal DOCTYPE entity (some third-party writers emit these)
+        // must not break the import.
+        val raw = XlsxImporter().import(bytes.inputStream())
+        assertEquals(listOf(listOf("value")), raw.rows)
     }
 
     @Test

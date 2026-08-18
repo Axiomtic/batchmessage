@@ -19,6 +19,6 @@ class MainActivityTest {
         composeRule.onNodeWithText("短信预览", substring = true).assertExists()
 
         composeRule.onNodeWithTag("nav-settings").performClick()
-        composeRule.onNodeWithText("忽略首行").assertExists()
+        composeRule.onNodeWithText("发送间隔").assertExists()
     }
 }

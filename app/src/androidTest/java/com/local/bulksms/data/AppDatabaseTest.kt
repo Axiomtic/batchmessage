@@ -72,6 +72,65 @@ class AppDatabaseTest {
     }
 
     @Test
+    fun migrationFromVersionTwoAddsBackupPhoneColumns() {
+        migrationHelper.createDatabase("migration-2", 2).apply {
+            execSQL(
+                "INSERT INTO workspace (id, importId, rawRowsJson, detectedHeader, firstRowIsHeader, " +
+                    "phoneColumnIndex, selectedTemplateId, selectedTemplateName, selectedTemplateBody, " +
+                    "selectedSubscriptionId, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                arrayOf<Any?>(
+                    "current",
+                    "import-1",
+                    "[[]]",
+                    1,
+                    1,
+                    1,
+                    null,
+                    "",
+                    "",
+                    null,
+                    1L,
+                ),
+            )
+            execSQL(
+                "INSERT INTO message_drafts (id, importId, rowId, phoneNumber, generatedBody, currentBody, " +
+                    "syncWithTable, manuallyEdited, columnNames, phoneColumnIndex) " +
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                arrayOf<Any?>(
+                    "draft-1",
+                    "import-1",
+                    0L,
+                    "13800138000",
+                    "正文",
+                    "正文",
+                    1,
+                    0,
+                    "[]",
+                    0,
+                ),
+            )
+            close()
+        }
+
+        migrationHelper.runMigrationsAndValidate(
+            "migration-2",
+            3,
+            true,
+            AppDatabase.MIGRATION_2_3,
+        ).use { migrated ->
+            migrated.query("SELECT backupPhoneColumnIndex FROM workspace WHERE id = 'current'").use { cursor ->
+                check(cursor.moveToFirst())
+                assertEquals(null, cursor.getString(0))
+            }
+            migrated.query("SELECT backupPhoneNumber, backupPhoneColumnIndex FROM message_drafts WHERE id = 'draft-1'").use { cursor ->
+                check(cursor.moveToFirst())
+                assertEquals("", cursor.getString(0))
+                assertEquals(null, cursor.getString(1))
+            }
+        }
+    }
+
+    @Test
     fun firstWorkspaceContainsSampleRowsAndDefaultTemplate() = runTest {
         val workspace = repository.loadOrCreateWorkspace()
 

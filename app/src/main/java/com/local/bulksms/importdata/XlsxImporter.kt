@@ -4,14 +4,16 @@ import com.local.bulksms.model.RawTable
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
+import java.io.StringReader
+import java.nio.charset.Charset
 import java.util.Locale
 import java.util.zip.ZipInputStream
+import javax.xml.parsers.DocumentBuilder
 import javax.xml.parsers.DocumentBuilderFactory
 import org.w3c.dom.Document
 import org.w3c.dom.Element
 import org.w3c.dom.Node
 import org.xml.sax.InputSource
-import java.io.StringReader
 
 /**
  * Reads the first visible worksheet from an OOXML workbook without a runtime library dependency.
@@ -258,26 +260,89 @@ class XlsxImporter : TableImporter {
         descendantElements(element, "t").joinToString(separator = "") { it.textContent }
 
     private fun parseXml(bytes: ByteArray, description: String): Document {
+        val builder = newSecureBuilder()
+        val failures = mutableListOf<String>()
+
+        // Pass 1: parse the raw bytes and let the parser honour the XML encoding
+        // declaration (plus any UTF-8/UTF-16 BOM).
         try {
-            val factory = DocumentBuilderFactory.newInstance()
-            factory.isNamespaceAware = true
-            factory.isExpandEntityReferences = false
+            return builder.parse(ByteArrayInputStream(bytes))
+        } catch (exception: Exception) {
+            failures += exception.message?.take(120).orEmpty()
+        }
+
+        // Pass 2: decode explicitly with a set of plausible encodings and parse the
+        // resulting string. Handles documents whose encoding declaration is wrong or
+        // missing (some WPS / domestic office suites emit these), plus a stray DOCTYPE.
+        val candidates = buildList {
+            detectXmlEncoding(bytes)?.let(::add)
+            addAll(listOf("UTF-8", "GBK", "GB18030", "GB2312", "ISO-8859-1"))
+        }.distinct()
+        for (encoding in candidates) {
+            try {
+                val text = decodeXmlBytes(bytes, encoding)
+                return builder.parse(InputSource(StringReader(text)))
+            } catch (exception: Exception) {
+                failures += "$encoding: ${exception.message?.take(80).orEmpty()}"
+            }
+        }
+        throw IllegalArgumentException(
+            "无法解析 $description（${failures.filter { it.isNotBlank() }.joinToString("；")}）",
+        )
+    }
+
+    private fun newSecureBuilder(): DocumentBuilder {
+        val factory = DocumentBuilderFactory.newInstance()
+        factory.isNamespaceAware = true
+        factory.isExpandEntityReferences = false
+        try {
             factory.setFeature(SECURE_PROCESSING_FEATURE, true)
-            factory.setFeature(DISALLOW_DOCTYPE_FEATURE, true)
+        } catch (_: Exception) {
+            // ignore: best effort hardening
+        }
+        try {
+            // Do NOT disallow DOCTYPE: some third-party workbooks carry one, and the
+            // empty entity resolver below already neutralises any external reference.
+            factory.setFeature(DISALLOW_DOCTYPE_FEATURE, false)
+        } catch (_: Exception) {
+            // ignore
+        }
+        try {
             factory.setFeature(EXTERNAL_GENERAL_ENTITIES_FEATURE, false)
             factory.setFeature(EXTERNAL_PARAMETER_ENTITIES_FEATURE, false)
             factory.setFeature(LOAD_EXTERNAL_DTD_FEATURE, false)
+        } catch (_: Exception) {
+            // ignore
+        }
+        try {
             factory.setAttribute(ACCESS_EXTERNAL_DTD_PROPERTY, "")
             factory.setAttribute(ACCESS_EXTERNAL_SCHEMA_PROPERTY, "")
-            factory.isXIncludeAware = false
-            val builder = factory.newDocumentBuilder()
-            builder.setEntityResolver(org.xml.sax.EntityResolver { _, _ ->
-                InputSource(StringReader(""))
-            })
-            return builder.parse(ByteArrayInputStream(bytes))
-        } catch (exception: Exception) {
-            throw IllegalArgumentException("无法解析 $description", exception)
+        } catch (_: Exception) {
+            // ignore
         }
+        factory.isXIncludeAware = false
+        val builder = factory.newDocumentBuilder()
+        builder.setEntityResolver(org.xml.sax.EntityResolver { _, _ ->
+            InputSource(StringReader(""))
+        })
+        return builder
+    }
+
+    private fun detectXmlEncoding(bytes: ByteArray): String? {
+        val header = String(bytes, 0, minOf(bytes.size, 200), Charsets.ISO_8859_1)
+        return XML_ENCODING_PATTERN.find(header)?.groupValues?.getOrNull(1)
+            ?.takeIf { it.isNotBlank() }
+    }
+
+    private fun decodeXmlBytes(bytes: ByteArray, encoding: String): String {
+        val charset = try {
+            Charset.forName(encoding)
+        } catch (_: Exception) {
+            Charsets.UTF_8
+        }
+        var text = String(bytes, charset)
+        if (text.startsWith('\uFEFF')) text = text.substring(1)
+        return text
     }
 
     private fun descendantElements(node: Node, name: String): List<Element> {
@@ -379,5 +444,6 @@ class XlsxImporter : TableImporter {
         const val LOAD_EXTERNAL_DTD_FEATURE = "http://apache.org/xml/features/nonvalidating/load-external-dtd"
         const val ACCESS_EXTERNAL_DTD_PROPERTY = "http://javax.xml.XMLConstants/property/accessExternalDTD"
         const val ACCESS_EXTERNAL_SCHEMA_PROPERTY = "http://javax.xml.XMLConstants/property/accessExternalSchema"
+        val XML_ENCODING_PATTERN = Regex("""<\?xml[^>]*encoding\s*=\s*["']([^"']+)["']""", RegexOption.IGNORE_CASE)
     }
 }
