@@ -14,6 +14,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -52,6 +53,7 @@ class MainActivity : ComponentActivity() {
                 val sendState by sendFlowViewModel.state.collectAsState()
                 val templateState by templateViewModel.state.collectAsState()
                 var externalDataNavigationRequest by remember { mutableLongStateOf(0L) }
+                var simPermissionRequested by remember { mutableStateOf(false) }
                 val composeScope = rememberCoroutineScope()
                 val simProvider = remember { SimSubscriptionProvider(this@MainActivity) }
                 val sendPreferences = remember { SendPreferences(this@MainActivity) }
@@ -102,7 +104,13 @@ class MainActivity : ComponentActivity() {
                     ) {
                         reloadSimOptions()
                     } else {
+                        // Ask for the SIM permission as soon as the app opens instead
+                        // of waiting for the user to visit the settings page.
                         sendFlowViewModel.setSimPermissionRequired()
+                        if (!simPermissionRequested) {
+                            simPermissionRequested = true
+                            simPermissionLauncher.launch(Manifest.permission.READ_PHONE_STATE)
+                        }
                     }
                 }
                 LaunchedEffect(sendState.workspaceReady) {
@@ -139,12 +147,13 @@ class MainActivity : ComponentActivity() {
                     templateState = templateState,
                     callbacks = BulkSmsCallbacks(
                         onClipboardImport = sendFlowViewModel::requestClipboardImport,
-                        onXlsxImport = sendFlowViewModel::requestXlsxImport,
+                        onExcelImport = sendFlowViewModel::requestExcelImport,
                         onConfirmImport = sendFlowViewModel::confirmPendingImport,
                         onCancelImport = sendFlowViewModel::cancelPendingImport,
                         onHeaderModeChanged = sendFlowViewModel::setFirstRowIsHeader,
                         onCellChanged = sendFlowViewModel::editCell,
                         onPhoneColumnSelected = sendFlowViewModel::selectPhoneColumn,
+                        onBackupPhoneColumnSelected = sendFlowViewModel::selectBackupPhoneColumn,
                         onAddRow = sendFlowViewModel::addRow,
                         onAddColumn = sendFlowViewModel::addColumn,
                         onDeleteRow = sendFlowViewModel::deleteRow,

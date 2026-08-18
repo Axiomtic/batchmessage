@@ -29,7 +29,7 @@ import java.io.InputStream
 
 data class BulkSmsCallbacks(
     val onClipboardImport: (String) -> Unit = {},
-    val onXlsxImport: (InputStream) -> Unit = {},
+    val onExcelImport: (InputStream) -> Unit = {},
     val onConfirmImport: () -> Unit = {},
     val onCancelImport: () -> Unit = {},
     val onCellChanged: (Long, Int, String) -> Unit = { _, _, _ -> },
@@ -39,6 +39,7 @@ data class BulkSmsCallbacks(
     val onDeleteColumn: (Int) -> Unit = {},
     val onHeaderModeChanged: (Boolean) -> Unit = {},
     val onPhoneColumnSelected: (Int) -> Unit = {},
+    val onBackupPhoneColumnSelected: (Int) -> Unit = {},
     val onSubscriptionSelected: (Int) -> Unit = {},
     val onRequestSimPermission: () -> Unit = {},
     val onRefreshSimOptions: () -> Unit = {},

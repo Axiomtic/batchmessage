@@ -4,11 +4,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.local.bulksms.data.BulkSmsRepository
 import com.local.bulksms.data.TemplateEntity
+import com.local.bulksms.importdata.ExcelImporter
 import com.local.bulksms.importdata.HeaderDetector
 import com.local.bulksms.importdata.PhoneColumnDetector
 import com.local.bulksms.importdata.TabularTextParser
 import com.local.bulksms.importdata.TableImporter
-import com.local.bulksms.importdata.XlsxImporter
 import com.local.bulksms.model.ImportedTable
 import com.local.bulksms.model.MessageDraft
 import com.local.bulksms.model.RawTable
@@ -45,6 +45,7 @@ data class SendFlowUiState(
     val table: ImportedTable? = null,
     val detectedHeader: Boolean = false,
     val selectedPhoneColumn: Int? = null,
+    val selectedBackupPhoneColumn: Int? = null,
     val importWarnings: List<String> = emptyList(),
     val blockingError: String? = null,
     val importId: String? = null,
@@ -66,7 +67,7 @@ data class SendFlowUiState(
 )
 
 class SendFlowViewModel(
-    private val xlsxImporter: TableImporter = XlsxImporter(),
+    private val excelImporter: TableImporter = ExcelImporter,
     private val repository: BulkSmsRepository? = null,
     private val idFactory: () -> String = { UUID.randomUUID().toString() },
     initialWorkspace: WorkspaceSnapshot = WorkspaceSnapshot.sample(),
@@ -113,10 +114,14 @@ class SendFlowViewModel(
         importRaw(importer = { TabularTextParser.parse(text) }, requireConfirmation = true)
 
     fun importXlsx(input: InputStream) =
-        importRaw(importer = { xlsxImporter.import(input) }, requireConfirmation = false)
+        importRaw(importer = { excelImporter.import(input) }, requireConfirmation = false)
 
     fun requestXlsxImport(input: InputStream) =
-        importRaw(importer = { xlsxImporter.import(input) }, requireConfirmation = true)
+        importRaw(importer = { excelImporter.import(input) }, requireConfirmation = true)
+
+    fun importExcel(input: InputStream) = importXlsx(input)
+
+    fun requestExcelImport(input: InputStream) = requestXlsxImport(input)
 
     fun reportImportError(message: String) = updateState {
         it.copy(pendingImport = null, blockingError = message)
@@ -138,10 +143,30 @@ class SendFlowViewModel(
         val current = mutableState.value
         val table = current.table ?: return
         if (columnIndex !in table.columns.indices) return
-        val updatedTable = table.copy(phoneColumnIndex = columnIndex)
+        val backup = current.selectedBackupPhoneColumn?.takeIf { it != columnIndex }
+        val updatedTable = table.copy(
+            phoneColumnIndex = columnIndex,
+            backupPhoneColumnIndex = backup,
+        )
         updateState {
             current.copy(
                 selectedPhoneColumn = columnIndex,
+                selectedBackupPhoneColumn = backup,
+                table = updatedTable,
+            ).replaceDrafts(refreshDrafts(current, updatedTable))
+        }
+    }
+
+    /** The backup phone column cannot be the same as the primary one. */
+    fun selectBackupPhoneColumn(columnIndex: Int) {
+        val current = mutableState.value
+        val table = current.table ?: return
+        if (columnIndex !in table.columns.indices) return
+        if (columnIndex == current.selectedPhoneColumn) return
+        val updatedTable = table.copy(backupPhoneColumnIndex = columnIndex)
+        updateState {
+            current.copy(
+                selectedBackupPhoneColumn = columnIndex,
                 table = updatedTable,
             ).replaceDrafts(refreshDrafts(current, updatedTable))
         }
@@ -227,12 +252,8 @@ class SendFlowViewModel(
             updateState { current.copy(blockingError = "请至少选择一条短信") }
             return null
         }
-        if (current.selectedPhoneColumn == null) {
-            updateState { current.copy(blockingError = "请先选择电话号码列") }
-            return null
-        }
-        if (selectedDrafts.any { it.phoneNumber.isBlank() }) {
-            updateState { current.copy(blockingError = "选中的短信包含空电话号码") }
+        if (current.selectedPhoneColumn == null && current.selectedBackupPhoneColumn == null) {
+            updateState { current.copy(blockingError = "请先在数据表中选择电话号码列") }
             return null
         }
         val subscriptionId = current.selectedSubscriptionId
@@ -247,15 +268,21 @@ class SendFlowViewModel(
             return null
         }
         targetRepository.saveDrafts(importId, current.drafts)
-        val taskId = targetRepository.freezeQueue(
-            importId = importId,
-            simSubscriptionId = subscriptionId,
-            selectedRowIds = current.selectedDraftRowIds,
-        )
+        val taskId = try {
+            targetRepository.freezeQueue(
+                importId = importId,
+                simSubscriptionId = subscriptionId,
+                selectedRowIds = current.selectedDraftRowIds,
+            )
+        } catch (error: IllegalArgumentException) {
+            updateState { current.copy(blockingError = error.message ?: "无法创建发送任务") }
+            return null
+        }
+        val itemCount = targetRepository.sendDao.itemsOnce(taskId).size
         mutableState.value = current.copy(
             blockingError = null,
             sendProgress = SendProgressUiState(
-                total = selectedDrafts.size,
+                total = itemCount,
                 processed = 0,
                 succeeded = 0,
                 failed = 0,
@@ -495,18 +522,20 @@ class SendFlowViewModel(
         val raw = current.rawTable ?: return
         val table = current.table ?: return
         if (table.columns.size <= 1 || columnIndex !in table.columns.indices) return
-        val adjustedPhoneColumn = when (val selected = current.selectedPhoneColumn) {
+        fun adjust(index: Int?): Int? = when (val selected = index) {
             null -> null
             columnIndex -> null
             in (columnIndex + 1)..Int.MAX_VALUE -> selected - 1
             else -> selected
         }
+        val adjustedPhoneColumn = adjust(current.selectedPhoneColumn)
+        val adjustedBackupPhoneColumn = adjust(current.selectedBackupPhoneColumn)
         val updatedRaw = raw.copy(
             rows = raw.rows.map { row ->
                 row.padTo(table.columns.size).filterIndexed { index, _ -> index != columnIndex }
             },
         )
-        rematerializeCurrent(updatedRaw, adjustedPhoneColumn)
+        rematerializeCurrent(updatedRaw, adjustedPhoneColumn, adjustedBackupPhoneColumn)
     }
 
     fun clearTable() {
@@ -546,6 +575,7 @@ class SendFlowViewModel(
                         table = table,
                         detectedHeader = detectedHeader,
                         selectedPhoneColumn = phoneColumn,
+                        selectedBackupPhoneColumn = null,
                         importWarnings = raw.warnings,
                         blockingError = null,
                         importId = idFactory(),
@@ -567,6 +597,7 @@ class SendFlowViewModel(
                     current.copy(
                         table = table,
                         selectedPhoneColumn = phoneColumn,
+                        selectedBackupPhoneColumn = null,
                         blockingError = null,
                     ).replaceDrafts(refreshDrafts(current, table))
                 }
@@ -578,18 +609,25 @@ class SendFlowViewModel(
     private fun rematerializeCurrent(
         updatedRaw: RawTable,
         selectedPhoneColumn: Int? = mutableState.value.selectedPhoneColumn,
+        selectedBackupPhoneColumn: Int? = mutableState.value.selectedBackupPhoneColumn,
     ) {
         val current = mutableState.value
         val firstRowIsHeader = current.table?.firstRowIsHeader ?: current.detectedHeader
         runCatching { HeaderDetector.materialize(updatedRaw, firstRowIsHeader) }.fold(
             onSuccess = { materialized ->
                 val selectedPhone = selectedPhoneColumn?.takeIf { it in materialized.columns.indices }
-                val table = materialized.copy(phoneColumnIndex = selectedPhone)
+                val selectedBackup = selectedBackupPhoneColumn
+                    ?.takeIf { it in materialized.columns.indices && it != selectedPhone }
+                val table = materialized.copy(
+                    phoneColumnIndex = selectedPhone,
+                    backupPhoneColumnIndex = selectedBackup,
+                )
                 updateState {
                     current.copy(
                         rawTable = updatedRaw,
                         table = table,
                         selectedPhoneColumn = selectedPhone,
+                        selectedBackupPhoneColumn = selectedBackup,
                         blockingError = null,
                     ).replaceDrafts(refreshDrafts(current, table))
                 }
@@ -640,6 +678,7 @@ class SendFlowViewModel(
             detectedHeader = detectedHeader,
             firstRowIsHeader = table?.firstRowIsHeader ?: detectedHeader,
             phoneColumnIndex = selectedPhoneColumn,
+            backupPhoneColumnIndex = selectedBackupPhoneColumn,
             selectedTemplateId = selectedTemplateId,
             selectedTemplateName = selectedTemplateName,
             selectedTemplateBody = selectedTemplateBody.orEmpty(),
@@ -658,7 +697,12 @@ class SendFlowViewModel(
             val raw = RawTable(workspace.rawRows)
             val materialized = HeaderDetector.materialize(raw, workspace.firstRowIsHeader)
             val phoneColumn = workspace.phoneColumnIndex?.takeIf { it in materialized.columns.indices }
-            val table = materialized.copy(phoneColumnIndex = phoneColumn)
+            val backupColumn = workspace.backupPhoneColumnIndex
+                ?.takeIf { it in materialized.columns.indices && it != phoneColumn }
+            val table = materialized.copy(
+                phoneColumnIndex = phoneColumn,
+                backupPhoneColumnIndex = backupColumn,
+            )
             val renderer = TemplateRenderer(table)
             val missing = renderer.validate(workspace.selectedTemplateBody)
             val drafts = if (missing.isEmpty()) {
@@ -670,6 +714,7 @@ class SendFlowViewModel(
                 table = table,
                 detectedHeader = workspace.detectedHeader,
                 selectedPhoneColumn = phoneColumn,
+                selectedBackupPhoneColumn = backupColumn,
                 importId = workspace.importId,
                 selectedTemplateId = workspace.selectedTemplateId,
                 selectedTemplateName = workspace.selectedTemplateName,

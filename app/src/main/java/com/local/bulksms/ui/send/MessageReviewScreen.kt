@@ -18,13 +18,19 @@ import androidx.compose.material3.TriStateCheckbox
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.local.bulksms.importdata.PhoneAvailability
+import com.local.bulksms.importdata.PhoneNumberChecker
 import com.local.bulksms.model.MessageDraft
 import com.local.bulksms.ui.icons.BulkSmsIcons
+import com.local.bulksms.ui.theme.availablePhoneColor
+import com.local.bulksms.ui.theme.emptyPhoneColor
+import com.local.bulksms.ui.theme.invalidPhoneColor
 
 @Composable
 fun MessageReviewScreen(
@@ -69,6 +75,7 @@ fun MessageReviewHeader(
         selectedCount == drafts.size -> ToggleableState.On
         else -> ToggleableState.Indeterminate
     }
+    val stats = draftPhoneStats(drafts)
     Row(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -91,6 +98,14 @@ fun MessageReviewHeader(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            if (stats.total > 0) {
+                Text(
+                    "号码  有效 ${stats.available} · 无效 ${stats.invalid} · 空 ${stats.empty}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.testTag("preview-phone-stats"),
+                )
+            }
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("全选", style = MaterialTheme.typography.bodySmall)
@@ -153,11 +168,18 @@ private fun MessageReviewItem(
                 verticalArrangement = Arrangement.spacedBy(5.dp),
             ) {
                 Text(
-                    "$ordinal · ${draft.phoneNumber.ifBlank { "未设置号码" }}",
+                    "$ordinal · 主:${draft.phoneNumber.ifBlank { "未设置" }}",
                     style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary,
+                    color = phoneColor(draft.phoneNumber),
                     fontWeight = FontWeight.SemiBold,
                 )
+                if (draft.backupPhoneNumber.isNotBlank()) {
+                    Text(
+                        "备:${draft.backupPhoneNumber}",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = phoneColor(draft.backupPhoneNumber),
+                    )
+                }
                 Text(draft.currentBody, style = MaterialTheme.typography.bodyMedium)
             }
             Checkbox(
@@ -168,4 +190,31 @@ private fun MessageReviewItem(
             )
         }
     }
+}
+
+@Composable
+private fun phoneColor(value: String): Color = when (PhoneNumberChecker.availability(value)) {
+    PhoneAvailability.AVAILABLE -> availablePhoneColor()
+    PhoneAvailability.INVALID -> invalidPhoneColor()
+    PhoneAvailability.EMPTY -> emptyPhoneColor()
+}
+
+private data class DraftPhoneStats(val available: Int, val invalid: Int, val empty: Int) {
+    val total: Int get() = available + invalid + empty
+}
+
+private fun draftPhoneStats(drafts: List<MessageDraft>): DraftPhoneStats {
+    var available = 0
+    var invalid = 0
+    var empty = 0
+    for (draft in drafts) {
+        for (value in listOf(draft.phoneNumber, draft.backupPhoneNumber)) {
+            when (PhoneNumberChecker.availability(value)) {
+                PhoneAvailability.AVAILABLE -> available++
+                PhoneAvailability.INVALID -> invalid++
+                PhoneAvailability.EMPTY -> empty++
+            }
+        }
+    }
+    return DraftPhoneStats(available, invalid, empty)
 }

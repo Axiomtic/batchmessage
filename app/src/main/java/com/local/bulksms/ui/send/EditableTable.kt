@@ -19,9 +19,16 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -32,7 +39,12 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.local.bulksms.importdata.PhoneAvailability
+import com.local.bulksms.importdata.PhoneNumberChecker
 import com.local.bulksms.model.ImportedTable
+import com.local.bulksms.ui.theme.availablePhoneColor
+import com.local.bulksms.ui.theme.emptyPhoneColor
+import com.local.bulksms.ui.theme.invalidPhoneColor
 
 data class CellEdit(val rowId: Long, val columnIndex: Int, val value: String)
 
@@ -45,6 +57,7 @@ fun EditableTable(
     onCellChanged: (CellEdit) -> Unit,
     onHeaderChanged: (HeaderEdit) -> Unit = {},
     onPhoneColumnSelected: (Int) -> Unit = {},
+    onBackupPhoneColumnSelected: (Int) -> Unit = {},
     onAddRow: () -> Unit = {},
     onAddColumn: () -> Unit = {},
     onDeleteRowRequested: (Long) -> Unit = {},
@@ -60,6 +73,7 @@ fun EditableTable(
     }
     val borderColor = MaterialTheme.colorScheme.outlineVariant
     val headerColor = MaterialTheme.colorScheme.surfaceVariant
+    var columnMenuIndex by remember { mutableStateOf<Int?>(null) }
     val columnWidths = table.columns.mapIndexed { index, column ->
         contentAwareColumnWidth(
             listOf(column.name) + table.rows.map { it.cells.getOrNull(index).orEmpty() },
@@ -81,13 +95,19 @@ fun EditableTable(
             Row {
                 AxisCell("", 36.dp, headerColor)
                 table.columns.forEachIndexed { index, column ->
+                    val badge = when (index) {
+                        table.phoneColumnIndex -> "主"
+                        table.backupPhoneColumnIndex -> "备"
+                        else -> null
+                    }
                     AxisCell(
                         text = column.name,
                         width = columnWidths[index],
                         background = headerColor,
+                        badge = badge,
                         modifier = Modifier
                             .combinedClickable(
-                                onClick = { },
+                                onClick = { columnMenuIndex = index },
                                 onLongClick = { onDeleteColumnRequested(index) },
                             )
                             .testTag("column-label-${column.name}"),
@@ -114,10 +134,18 @@ fun EditableTable(
                             .testTag("row-label-$rowIndex"),
                     )
                     table.columns.indices.forEach { columnIndex ->
+                        val value = row.cells.getOrNull(columnIndex).orEmpty()
+                        val isPhoneColumn = columnIndex == table.phoneColumnIndex ||
+                            columnIndex == table.backupPhoneColumnIndex
+                        val textColor = if (isPhoneColumn) {
+                            phoneCellColor(PhoneNumberChecker.availability(value))
+                        } else {
+                            MaterialTheme.colorScheme.onSurface
+                        }
                         BasicTextField(
-                            value = row.cells.getOrNull(columnIndex).orEmpty(),
-                            onValueChange = { value ->
-                                onCellChanged(CellEdit(row.id, columnIndex, value))
+                            value = value,
+                            onValueChange = { newValue ->
+                                onCellChanged(CellEdit(row.id, columnIndex, newValue))
                             },
                             modifier = Modifier
                                 .width(columnWidths[columnIndex])
@@ -126,9 +154,7 @@ fun EditableTable(
                                 .padding(horizontal = 8.dp, vertical = 9.dp)
                                 .testTag("cell-${row.id}-$columnIndex"),
                             singleLine = true,
-                            textStyle = MaterialTheme.typography.bodySmall.copy(
-                                color = MaterialTheme.colorScheme.onSurface,
-                            ),
+                            textStyle = MaterialTheme.typography.bodySmall.copy(color = textColor),
                         )
                     }
                     Box(Modifier.size(40.dp))
@@ -149,7 +175,55 @@ fun EditableTable(
                 )
             }
         }
+
+        columnMenuIndex?.let { menuIndex ->
+            val column = table.columns.getOrNull(menuIndex) ?: return@let
+            DropdownMenu(
+                expanded = true,
+                onDismissRequest = { columnMenuIndex = null },
+                modifier = Modifier.testTag("column-menu"),
+            ) {
+                Text(
+                    "列 ${column.name}",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                )
+                DropdownMenuItem(
+                    text = { Text(if (menuIndex == table.phoneColumnIndex) "✓ 主电话号码列" else "设为主电话号码列") },
+                    onClick = {
+                        columnMenuIndex = null
+                        onPhoneColumnSelected(menuIndex)
+                    },
+                    modifier = Modifier.testTag("column-menu-phone"),
+                )
+                DropdownMenuItem(
+                    text = { Text(if (menuIndex == table.backupPhoneColumnIndex) "✓ 备用电话号码列" else "设为备用电话号码列") },
+                    onClick = {
+                        columnMenuIndex = null
+                        onBackupPhoneColumnSelected(menuIndex)
+                    },
+                    modifier = Modifier.testTag("column-menu-backup-phone"),
+                )
+                HorizontalDivider()
+                DropdownMenuItem(
+                    text = { Text("删除该列", color = MaterialTheme.colorScheme.error) },
+                    onClick = {
+                        columnMenuIndex = null
+                        onDeleteColumnRequested(menuIndex)
+                    },
+                    modifier = Modifier.testTag("column-menu-delete"),
+                )
+            }
+        }
     }
+}
+
+@Composable
+private fun phoneCellColor(availability: PhoneAvailability): Color = when (availability) {
+    PhoneAvailability.AVAILABLE -> availablePhoneColor()
+    PhoneAvailability.INVALID -> invalidPhoneColor()
+    PhoneAvailability.EMPTY -> emptyPhoneColor()
 }
 
 @Composable
@@ -157,6 +231,7 @@ private fun AxisCell(
     text: String,
     width: Dp,
     background: Color,
+    badge: String? = null,
     modifier: Modifier = Modifier,
 ) {
     Box(
@@ -167,7 +242,24 @@ private fun AxisCell(
             .border(0.5.dp, MaterialTheme.colorScheme.outlineVariant),
         contentAlignment = Alignment.Center,
     ) {
-        Text(text, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+        Text(
+            text,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.SemiBold,
+        )
+        badge?.let { value ->
+            Text(
+                value,
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onPrimary,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(2.dp)
+                    .background(MaterialTheme.colorScheme.primary, CircleShape)
+                    .padding(horizontal = 3.dp),
+            )
+        }
     }
 }
 

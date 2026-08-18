@@ -38,7 +38,7 @@ class AppTypeConverters {
         SendItemEntity::class,
         SendAttemptEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = true,
 )
 @TypeConverters(AppTypeConverters::class)
@@ -79,10 +79,22 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Phone columns are now bound to the workspace (session) instead of
+                // living inside the template; a backup phone column was added.
+                db.execSQL("ALTER TABLE `workspace` ADD COLUMN `backupPhoneColumnIndex` INTEGER")
+                db.execSQL(
+                    "ALTER TABLE `message_drafts` ADD COLUMN `backupPhoneNumber` TEXT NOT NULL DEFAULT ''",
+                )
+                db.execSQL("ALTER TABLE `message_drafts` ADD COLUMN `backupPhoneColumnIndex` INTEGER")
+            }
+        }
+
         fun create(context: Context): AppDatabase = Room.databaseBuilder(
             context.applicationContext,
             AppDatabase::class.java,
             DATABASE_NAME,
-        ).addMigrations(MIGRATION_1_2).build()
+        ).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build()
     }
 }

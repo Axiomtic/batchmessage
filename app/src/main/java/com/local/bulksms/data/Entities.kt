@@ -41,6 +41,7 @@ data class WorkspaceEntity(
     val detectedHeader: Boolean,
     val firstRowIsHeader: Boolean,
     val phoneColumnIndex: Int?,
+    val backupPhoneColumnIndex: Int? = null,
     val selectedTemplateId: String?,
     val selectedTemplateName: String,
     val selectedTemplateBody: String,
@@ -53,6 +54,7 @@ data class WorkspaceEntity(
         detectedHeader = detectedHeader,
         firstRowIsHeader = firstRowIsHeader,
         phoneColumnIndex = phoneColumnIndex,
+        backupPhoneColumnIndex = backupPhoneColumnIndex,
         selectedTemplateId = selectedTemplateId,
         selectedTemplateName = selectedTemplateName,
         selectedTemplateBody = selectedTemplateBody,
@@ -69,6 +71,7 @@ data class WorkspaceEntity(
                 detectedHeader = snapshot.detectedHeader,
                 firstRowIsHeader = snapshot.firstRowIsHeader,
                 phoneColumnIndex = snapshot.phoneColumnIndex,
+                backupPhoneColumnIndex = snapshot.backupPhoneColumnIndex,
                 selectedTemplateId = snapshot.selectedTemplateId,
                 selectedTemplateName = snapshot.selectedTemplateName,
                 selectedTemplateBody = snapshot.selectedTemplateBody,
@@ -104,6 +107,7 @@ data class MessageDraftEntity(
     val importId: String,
     val rowId: Long,
     val phoneNumber: String,
+    val backupPhoneNumber: String = "",
     val generatedBody: String,
     val currentBody: String,
     val syncWithTable: Boolean = true,
@@ -111,16 +115,19 @@ data class MessageDraftEntity(
     /** Stored through [AppTypeConverters] so the rendering context survives a restart. */
     val columnNames: List<String>,
     val phoneColumnIndex: Int?,
+    val backupPhoneColumnIndex: Int? = null,
 ) {
     fun toMessageDraft(): MessageDraft = MessageDraft(
         rowId = rowId,
         phoneNumber = phoneNumber,
+        backupPhoneNumber = backupPhoneNumber,
         generatedBody = generatedBody,
         currentBody = currentBody,
         syncWithTable = syncWithTable,
         manuallyEdited = manuallyEdited,
         columnNames = columnNames,
         phoneColumnIndex = phoneColumnIndex,
+        backupPhoneColumnIndex = backupPhoneColumnIndex,
     )
 
     companion object {
@@ -130,12 +137,14 @@ data class MessageDraftEntity(
                 importId = importId,
                 rowId = draft.rowId,
                 phoneNumber = draft.phoneNumber,
+                backupPhoneNumber = draft.backupPhoneNumber,
                 generatedBody = draft.generatedBody,
                 currentBody = draft.currentBody,
                 syncWithTable = draft.syncWithTable,
                 manuallyEdited = draft.manuallyEdited,
                 columnNames = draft.columnNames,
                 phoneColumnIndex = draft.phoneColumnIndex,
+                backupPhoneColumnIndex = draft.backupPhoneColumnIndex,
             )
     }
 }

@@ -10,14 +10,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.RadioButton
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -36,7 +32,6 @@ import com.local.bulksms.sms.parseSendIntervalMillis
 import com.local.bulksms.ui.BulkSmsCallbacks
 import com.local.bulksms.ui.icons.BulkSmsIcons
 import com.local.bulksms.ui.send.SendFlowUiState
-import com.local.bulksms.ui.send.SimDetectionState
 import com.local.bulksms.ui.theme.neutralOutlinedTextFieldColors
 
 @Composable
@@ -66,35 +61,6 @@ fun SettingsScreen(
             }
         }
         item {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-                ),
-                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(Modifier.weight(1f)) {
-                        Text("忽略首行", style = MaterialTheme.typography.titleMedium)
-                        Text(
-                            "开启后，导入数据的第一行不参与短信生成。列号始终使用 A、B、C。",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    Switch(
-                        checked = state.table?.firstRowIsHeader == true,
-                        onCheckedChange = callbacks.onHeaderModeChanged,
-                        modifier = Modifier.testTag("ignore-first-row"),
-                    )
-                }
-            }
-        }
-        item {
             SettingsGroup(title = "发送间隔", iconRes = BulkSmsIcons.Interval) {
                 SendIntervalField(
                     intervalMillis = state.sendIntervalMillis,
@@ -103,53 +69,11 @@ fun SettingsScreen(
             }
         }
         item {
-            SettingsGroup(title = "发送 SIM", iconRes = BulkSmsIcons.Sim) {
-                when (state.simDetectionState) {
-                    SimDetectionState.PERMISSION_REQUIRED -> {
-                        Text(
-                            "需要电话权限才能读取 SIM",
-                            modifier = Modifier.padding(top = 10.dp),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        TextButton(
-                            onClick = callbacks.onRequestSimPermission,
-                            modifier = Modifier.testTag("grant-sim-permission"),
-                        ) { Text("允许读取 SIM") }
-                    }
-                    SimDetectionState.LOADING -> Row(
-                        modifier = Modifier.padding(vertical = 12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        CircularProgressIndicator()
-                        Text("正在检测 SIM")
-                    }
-                    SimDetectionState.EMPTY -> {
-                        Text(
-                            "没有检测到活动 SIM",
-                            modifier = Modifier.padding(top = 10.dp),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        TextButton(onClick = callbacks.onRefreshSimOptions) { Text("重新检测") }
-                    }
-                    SimDetectionState.ERROR -> {
-                        Text(
-                            state.simDetectionError ?: "SIM 检测失败",
-                            modifier = Modifier.padding(top = 10.dp),
-                            color = MaterialTheme.colorScheme.error,
-                        )
-                        TextButton(onClick = callbacks.onRefreshSimOptions) { Text("重试") }
-                    }
-                    SimDetectionState.AVAILABLE -> state.simOptions.forEach { sim ->
-                        ChoiceRow(
-                            label = sim.displayLabel,
-                            selected = state.selectedSubscriptionId == sim.subscriptionId,
-                            testTag = "sim-${sim.subscriptionId}",
-                            onClick = { callbacks.onSubscriptionSelected(sim.subscriptionId) },
-                        )
-                    }
-                }
-            }
+            Text(
+                "SIM 卡选择、电话号码列和首行字段设置请前往数据或发送页面。",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
@@ -213,25 +137,5 @@ private fun SettingsGroup(title: String, iconRes: Int, content: @Composable () -
             }
             content()
         }
-    }
-}
-
-@Composable
-private fun ChoiceRow(
-    label: String,
-    selected: Boolean,
-    testTag: String,
-    onClick: () -> Unit,
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        RadioButton(
-            selected = selected,
-            onClick = onClick,
-            modifier = Modifier.testTag(testTag),
-        )
-        Text(label)
     }
 }

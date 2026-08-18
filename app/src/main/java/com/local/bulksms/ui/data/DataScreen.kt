@@ -16,6 +16,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -30,12 +31,18 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.local.bulksms.importdata.PhoneAvailability
+import com.local.bulksms.importdata.PhoneNumberChecker
+import com.local.bulksms.model.ImportedTable
 import com.local.bulksms.ui.BulkSmsCallbacks
 import com.local.bulksms.ui.icons.BulkSmsIcons
 import com.local.bulksms.ui.send.EditableTable
 import com.local.bulksms.ui.send.SendFlowUiState
 
-private const val XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+private val EXCEL_MIME_TYPES = arrayOf(
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/vnd.ms-excel",
+)
 
 private sealed interface DeleteTarget {
     data class Row(val rowId: Long, val ordinal: Int) : DeleteTarget
@@ -51,7 +58,7 @@ fun DataScreen(
     val context = LocalContext.current
     var deleteTarget by remember { mutableStateOf<DeleteTarget?>(null) }
     val fileLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        uri?.let { context.contentResolver.openInputStream(it)?.use(callbacks.onXlsxImport) }
+        uri?.let { context.contentResolver.openInputStream(it)?.use(callbacks.onExcelImport) }
     }
 
     Column(
@@ -67,10 +74,10 @@ fun DataScreen(
         ) {
             ImportCard(
                 label = "文件",
-                hint = "Excel .xlsx",
+                hint = "Excel .xlsx / .xls",
                 iconRes = BulkSmsIcons.File,
                 modifier = Modifier.weight(1f).testTag("import-file"),
-                onClick = { fileLauncher.launch(arrayOf(XLSX_MIME)) },
+                onClick = { fileLauncher.launch(EXCEL_MIME_TYPES) },
             )
             ImportCard(
                 label = "剪贴板",
@@ -90,25 +97,57 @@ fun DataScreen(
             )
         }
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text("数据表格", style = MaterialTheme.typography.titleMedium)
-            Text(
-                "${state.table?.rows?.size ?: 0} 行 · ${state.table?.columns?.size ?: 0} 列",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-
         state.table?.let { table ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("数据表格", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "${table.rows.size} 行 · ${table.columns.size} 列",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("首行作为字段", style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        "开启后第一行文本作为字段名，可直接在模板中用 {字段名}；点击列头可设主/备用电话号码列",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(
+                    checked = table.firstRowIsHeader,
+                    onCheckedChange = callbacks.onHeaderModeChanged,
+                    modifier = Modifier.testTag("first-row-as-fields"),
+                )
+            }
+
+            val stats = phoneStats(table)
+            if (stats.total > 0) {
+                Text(
+                    "电话号码  有效 ${stats.available} · 无效 ${stats.invalid} · 空 ${stats.empty}",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.testTag("phone-stats"),
+                )
+            }
+
             EditableTable(
                 table = table,
                 onCellChanged = { callbacks.onCellChanged(it.rowId, it.columnIndex, it.value) },
                 onAddRow = callbacks.onAddRow,
                 onAddColumn = callbacks.onAddColumn,
+                onPhoneColumnSelected = callbacks.onPhoneColumnSelected,
+                onBackupPhoneColumnSelected = callbacks.onBackupPhoneColumnSelected,
                 onDeleteRowRequested = { rowId ->
                     val ordinal = table.rows.indexOfFirst { it.id == rowId } + 1
                     deleteTarget = DeleteTarget.Row(rowId, ordinal)
@@ -158,6 +197,28 @@ fun DataScreen(
             },
         )
     }
+}
+
+private data class PhoneStats(val available: Int, val invalid: Int, val empty: Int) {
+    val total: Int get() = available + invalid + empty
+}
+
+private fun phoneStats(table: ImportedTable): PhoneStats {
+    val indexes = listOfNotNull(table.phoneColumnIndex, table.backupPhoneColumnIndex)
+    if (indexes.isEmpty()) return PhoneStats(0, 0, 0)
+    var available = 0
+    var invalid = 0
+    var empty = 0
+    for (row in table.rows) {
+        for (index in indexes) {
+            when (PhoneNumberChecker.availability(row.cells.getOrNull(index).orEmpty())) {
+                PhoneAvailability.AVAILABLE -> available++
+                PhoneAvailability.INVALID -> invalid++
+                PhoneAvailability.EMPTY -> empty++
+            }
+        }
+    }
+    return PhoneStats(available, invalid, empty)
 }
 
 @Composable

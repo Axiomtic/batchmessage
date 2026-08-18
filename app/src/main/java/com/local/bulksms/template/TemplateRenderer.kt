@@ -8,12 +8,22 @@ import com.local.bulksms.model.MessageDraft
 class TemplateRenderer(
     private val columns: List<DynamicColumn> = emptyList(),
     private val phoneColumnIndex: Int? = null,
+    private val backupPhoneColumnIndex: Int? = null,
 ) {
-    constructor(table: ImportedTable) : this(table.columns, table.phoneColumnIndex)
+    constructor(table: ImportedTable) : this(
+        table.columns,
+        table.phoneColumnIndex,
+        table.backupPhoneColumnIndex,
+    )
 
-    constructor(columnNames: Collection<String>, phoneColumnIndex: Int? = null) : this(
+    constructor(
+        columnNames: Collection<String>,
+        phoneColumnIndex: Int? = null,
+        backupPhoneColumnIndex: Int? = null,
+    ) : this(
         columnNames.mapIndexed(::DynamicColumn),
         phoneColumnIndex,
+        backupPhoneColumnIndex,
     )
 
     private val token = Regex("\\{([^{}]+)\\}")
@@ -40,7 +50,7 @@ class TemplateRenderer(
 
     fun renderDraft(row: DynamicRow, template: String): MessageDraft {
         require(columns.isNotEmpty()) { "渲染草稿需要动态列" }
-        return renderDraftWithColumns(row, template, columns, phoneColumnIndex)
+        return renderDraftWithColumns(row, template, columns, phoneColumnIndex, backupPhoneColumnIndex)
     }
 
     internal fun renderDraftWithColumns(
@@ -48,6 +58,7 @@ class TemplateRenderer(
         template: String,
         columns: List<DynamicColumn>,
         phoneColumnIndex: Int?,
+        backupPhoneColumnIndex: Int? = null,
     ): MessageDraft {
         val columnNames = columns.map(DynamicColumn::name)
         val missing = validate(template, columnNames)
@@ -58,13 +69,16 @@ class TemplateRenderer(
         }.toMap()
         val body = render(template, values)
         val phoneNumber = phoneColumnIndex?.let { row.cells.getOrNull(it).orEmpty() }.orEmpty()
+        val backupPhoneNumber = backupPhoneColumnIndex?.let { row.cells.getOrNull(it).orEmpty() }.orEmpty()
         return MessageDraft(
             rowId = row.id,
             phoneNumber = phoneNumber,
+            backupPhoneNumber = backupPhoneNumber,
             generatedBody = body,
             currentBody = body,
             columnNames = columnNames,
             phoneColumnIndex = phoneColumnIndex,
+            backupPhoneColumnIndex = backupPhoneColumnIndex,
         )
     }
 
@@ -73,11 +87,13 @@ class TemplateRenderer(
         template: String,
         columnNames: List<String>,
         phoneColumnIndex: Int?,
+        backupPhoneColumnIndex: Int? = null,
     ): MessageDraft = renderDraftWithColumns(
         row = row,
         template = template,
         columns = columnNames.mapIndexed(::DynamicColumn),
         phoneColumnIndex = phoneColumnIndex,
+        backupPhoneColumnIndex = backupPhoneColumnIndex,
     )
 }
 
@@ -120,12 +136,14 @@ object DraftSynchronizer {
         template: String,
         columnNames: List<String>,
         phoneColumnIndex: Int? = draft.phoneColumnIndex,
+        backupPhoneColumnIndex: Int? = draft.backupPhoneColumnIndex,
     ): MessageDraft {
         if (!draft.syncWithTable) return draft
-        return rendererFor(columnNames, phoneColumnIndex).renderDraft(row, template).copy(
-            syncWithTable = true,
-            manuallyEdited = draft.manuallyEdited,
-        )
+        return rendererFor(columnNames, phoneColumnIndex, backupPhoneColumnIndex)
+            .renderDraft(row, template).copy(
+                syncWithTable = true,
+                manuallyEdited = draft.manuallyEdited,
+            )
     }
 
     fun setSynced(
@@ -162,20 +180,27 @@ object DraftSynchronizer {
         template: String,
         columnNames: List<String>,
         phoneColumnIndex: Int? = draft.phoneColumnIndex,
+        backupPhoneColumnIndex: Int? = draft.backupPhoneColumnIndex,
     ): MessageDraft {
         if (!synced) return draft.copy(syncWithTable = false)
-        return rendererFor(columnNames, phoneColumnIndex).renderDraft(row, template).copy(
-            syncWithTable = true,
-            manuallyEdited = draft.manuallyEdited,
-        )
+        return rendererFor(columnNames, phoneColumnIndex, backupPhoneColumnIndex)
+            .renderDraft(row, template).copy(
+                syncWithTable = true,
+                manuallyEdited = draft.manuallyEdited,
+            )
     }
 
     private fun rendererFor(draft: MessageDraft): TemplateRenderer =
-        rendererFor(draft.columnNames, draft.phoneColumnIndex)
+        rendererFor(draft.columnNames, draft.phoneColumnIndex, draft.backupPhoneColumnIndex)
 
-    private fun rendererFor(columnNames: List<String>, phoneColumnIndex: Int?): TemplateRenderer =
+    private fun rendererFor(
+        columnNames: List<String>,
+        phoneColumnIndex: Int?,
+        backupPhoneColumnIndex: Int?,
+    ): TemplateRenderer =
         TemplateRenderer(
             columns = columnNames.mapIndexed(::DynamicColumn),
             phoneColumnIndex = phoneColumnIndex,
+            backupPhoneColumnIndex = backupPhoneColumnIndex,
         )
 }

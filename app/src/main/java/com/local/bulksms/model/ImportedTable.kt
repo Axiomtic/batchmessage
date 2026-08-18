@@ -20,4 +20,5 @@ data class ImportedTable(
     val rows: List<DynamicRow>,
     val firstRowIsHeader: Boolean,
     val phoneColumnIndex: Int? = null,
+    val backupPhoneColumnIndex: Int? = null,
 )

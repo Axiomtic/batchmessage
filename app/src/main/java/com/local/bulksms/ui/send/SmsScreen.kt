@@ -13,6 +13,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
@@ -51,7 +52,7 @@ fun SmsScreen(
     modifier: Modifier = Modifier,
 ) {
     var templateMenuOpen by remember { mutableStateOf(false) }
-    var phoneColumnMenuOpen by remember { mutableStateOf(false) }
+    var simMenuOpen by remember { mutableStateOf(false) }
     var showCreateDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showSendDialog by remember { mutableStateOf(false) }
@@ -61,6 +62,12 @@ fun SmsScreen(
     val selectedCount = state.selectedDraftRowIds.count { selected ->
         state.drafts.any { it.rowId == selected }
     }
+    val pendingMessageCount = state.drafts
+        .filter { it.rowId in state.selectedDraftRowIds }
+        .sumOf { draft ->
+            (if (draft.phoneNumber.isNotBlank()) 1 else 0) +
+                (if (draft.backupPhoneNumber.isNotBlank()) 1 else 0)
+        }
 
     Column(
         modifier = modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 10.dp),
@@ -165,47 +172,6 @@ fun SmsScreen(
                 }
 
                 val columns = state.table?.columns.orEmpty()
-                val selectedColumnName = state.selectedPhoneColumn
-                    ?.let { index -> columns.getOrNull(index)?.name }
-                    .orEmpty()
-                ExposedDropdownMenuBox(
-                    expanded = phoneColumnMenuOpen,
-                    onExpandedChange = {
-                        if (controlsEnabled && columns.isNotEmpty()) phoneColumnMenuOpen = it
-                    },
-                ) {
-                    OutlinedTextField(
-                        value = selectedColumnName.takeIf { it.isNotBlank() }?.let { "$it 列" }.orEmpty(),
-                        onValueChange = {},
-                        readOnly = true,
-                        enabled = controlsEnabled && columns.isNotEmpty(),
-                        label = { Text("电话号码列") },
-                        placeholder = { Text("选择列") },
-                        trailingIcon = {
-                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = phoneColumnMenuOpen)
-                        },
-                        colors = neutralOutlinedTextFieldColors(),
-                        modifier = Modifier
-                            .menuAnchor()
-                            .fillMaxWidth()
-                            .testTag("template-phone-column"),
-                    )
-                    ExposedDropdownMenu(
-                        expanded = phoneColumnMenuOpen,
-                        onDismissRequest = { phoneColumnMenuOpen = false },
-                    ) {
-                        columns.forEachIndexed { index, column ->
-                            DropdownMenuItem(
-                                text = { Text("${column.name} 列") },
-                                onClick = {
-                                    phoneColumnMenuOpen = false
-                                    callbacks.onPhoneColumnSelected(index)
-                                },
-                            )
-                        }
-                    }
-                }
-
                 OutlinedTextField(
                     value = templateState.editorBody.ifEmpty { state.selectedTemplateBody.orEmpty() },
                     onValueChange = callbacks.onTemplateBodyChanged,
@@ -214,11 +180,19 @@ fun SmsScreen(
                         .fillMaxWidth()
                         .heightIn(min = 82.dp)
                         .testTag("template-body"),
-                    placeholder = { Text("输入模板内容，如：您好，{A}……") },
+                    placeholder = { Text("输入模板内容，如：您好，{名字}……") },
                     colors = neutralOutlinedTextFieldColors(),
                     minLines = 2,
                     maxLines = 3,
                 )
+                if (columns.isNotEmpty()) {
+                    Text(
+                        "可用字段：${columns.joinToString("、") { it.name }}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.testTag("template-fields-hint"),
+                    )
+                }
             }
         }
 
@@ -281,40 +255,54 @@ fun SmsScreen(
                     progress = progress,
                     onSendAgain = { showSendDialog = true },
                     canSendAgain = selectedCount > 0 &&
-                        state.selectedPhoneColumn != null &&
+                        (state.selectedPhoneColumn != null || state.selectedBackupPhoneColumn != null) &&
                         state.simOptions.any { it.subscriptionId == state.selectedSubscriptionId },
                 )
             } else {
-                Row(
+                Column(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    val simLabel = state.simOptions
-                        .firstOrNull { it.subscriptionId == state.selectedSubscriptionId }
-                        ?.displayLabel ?: when (state.simDetectionState) {
-                            SimDetectionState.PERMISSION_REQUIRED -> "请在设置中授权读取 SIM"
-                            SimDetectionState.LOADING -> "正在检测 SIM"
-                            SimDetectionState.EMPTY -> "没有检测到活动 SIM"
-                            SimDetectionState.ERROR -> "SIM 检测失败"
-                            SimDetectionState.AVAILABLE -> "请选择发送 SIM"
-                        }
-                    Column(Modifier.weight(1f)) {
-                        Text(simLabel, style = MaterialTheme.typography.labelMedium)
-                        Text("待发送 $selectedCount 条", style = MaterialTheme.typography.labelSmall)
-                    }
-                    Button(
-                        onClick = { showSendDialog = true },
-                        enabled = selectedCount > 0 &&
-                            state.selectedPhoneColumn != null &&
-                            state.simOptions.any { it.subscriptionId == state.selectedSubscriptionId },
-                        modifier = Modifier.testTag("send-selected"),
+                    SimSelector(
+                        state = state,
+                        enabled = controlsEnabled,
+                        menuOpen = simMenuOpen,
+                        onMenuOpenChange = { simMenuOpen = it },
+                        callbacks = callbacks,
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Icon(
-                            painter = painterResource(BulkSmsIcons.Send),
-                            contentDescription = null,
-                        )
-                        Text("确认并发送")
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                "待发送 $pendingMessageCount 条",
+                                style = MaterialTheme.typography.labelMedium,
+                            )
+                            Text(
+                                if (state.selectedPhoneColumn != null || state.selectedBackupPhoneColumn != null) {
+                                    "主/备用号码各发送一次，空号码自动忽略"
+                                } else {
+                                    "请在数据表点击列头设置电话号码列"
+                                },
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Button(
+                            onClick = { showSendDialog = true },
+                            enabled = pendingMessageCount > 0 &&
+                                (state.selectedPhoneColumn != null || state.selectedBackupPhoneColumn != null) &&
+                                state.simOptions.any { it.subscriptionId == state.selectedSubscriptionId },
+                            modifier = Modifier.testTag("send-selected"),
+                        ) {
+                            Icon(
+                                painter = painterResource(BulkSmsIcons.Send),
+                                contentDescription = null,
+                            )
+                            Text("确认并发送")
+                        }
                     }
                 }
             }
@@ -431,6 +419,108 @@ private fun SendProgressFooter(
                 style = MaterialTheme.typography.bodySmall,
             )
             TextButton(onClick = onSendAgain, enabled = canSendAgain) { Text("再次发送") }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SimSelector(
+    state: SendFlowUiState,
+    enabled: Boolean,
+    menuOpen: Boolean,
+    onMenuOpenChange: (Boolean) -> Unit,
+    callbacks: BulkSmsCallbacks,
+) {
+    when (state.simDetectionState) {
+        SimDetectionState.AVAILABLE -> {
+            val selected = state.simOptions.firstOrNull {
+                it.subscriptionId == state.selectedSubscriptionId
+            }
+            ExposedDropdownMenuBox(
+                expanded = menuOpen,
+                onExpandedChange = {
+                    if (enabled && state.simOptions.isNotEmpty()) onMenuOpenChange(it)
+                },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                OutlinedTextField(
+                    value = selected?.displayLabel.orEmpty(),
+                    onValueChange = {},
+                    readOnly = true,
+                    enabled = enabled,
+                    label = { Text("发送 SIM") },
+                    placeholder = { Text("选择发送 SIM") },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = menuOpen) },
+                    colors = neutralOutlinedTextFieldColors(),
+                    modifier = Modifier
+                        .menuAnchor()
+                        .fillMaxWidth()
+                        .testTag("sim-selector"),
+                )
+                ExposedDropdownMenu(
+                    expanded = menuOpen,
+                    onDismissRequest = { onMenuOpenChange(false) },
+                ) {
+                    state.simOptions.forEach { sim ->
+                        DropdownMenuItem(
+                            text = { Text(sim.displayLabel) },
+                            onClick = {
+                                onMenuOpenChange(false)
+                                callbacks.onSubscriptionSelected(sim.subscriptionId)
+                            },
+                            modifier = Modifier.testTag("sim-option-${sim.subscriptionId}"),
+                        )
+                    }
+                }
+            }
+        }
+        SimDetectionState.PERMISSION_REQUIRED -> Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                "需要电话权限才能读取 SIM",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            TextButton(
+                onClick = callbacks.onRequestSimPermission,
+                modifier = Modifier.testTag("grant-sim-permission"),
+            ) { Text("授权读取 SIM") }
+        }
+        SimDetectionState.LOADING -> Row(
+            modifier = Modifier.padding(vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            CircularProgressIndicator()
+            Text("正在检测 SIM", style = MaterialTheme.typography.bodySmall)
+        }
+        SimDetectionState.EMPTY -> Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                "没有检测到活动 SIM",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            TextButton(onClick = callbacks.onRefreshSimOptions) { Text("重新检测") }
+        }
+        SimDetectionState.ERROR -> Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                state.simDetectionError ?: "SIM 检测失败",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+            TextButton(onClick = callbacks.onRefreshSimOptions) { Text("重试") }
         }
     }
 }

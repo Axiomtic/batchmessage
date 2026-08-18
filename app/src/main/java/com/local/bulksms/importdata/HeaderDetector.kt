@@ -36,7 +36,11 @@ object HeaderDetector {
             throw ImportLimitExceeded(dataRows.size)
         }
 
-        val names = (0 until width).map(::columnAddress)
+        val names = if (firstRowIsHeader) {
+            headerNames(raw.rows.firstOrNull().orEmpty(), width)
+        } else {
+            (0 until width).map(::columnAddress)
+        }
         val columns = names.mapIndexed { index, name -> DynamicColumn(id = index, name = name) }
         val rows = dataRows.mapIndexed { index, cells ->
             DynamicRow(id = index.toLong(), cells = cells.padTo(width))
@@ -47,6 +51,27 @@ object HeaderDetector {
             rows = rows,
             firstRowIsHeader = firstRowIsHeader,
         )
+    }
+
+    /**
+     * Column names come straight from the header row text so templates can reference
+     * `{字段名}` directly. Blank headings fall back to the column address (A、B、C)
+     * and duplicate headings get a numeric suffix so variable names stay unique.
+     */
+    private fun headerNames(headerRow: List<String>, width: Int): List<String> {
+        val used = mutableSetOf<String>()
+        return (0 until width).map { index ->
+            val base = headerRow.getOrNull(index).orEmpty().trim()
+                .ifBlank { columnAddress(index) }
+            var candidate = base
+            var suffix = 2
+            while (candidate in used) {
+                candidate = "$base$suffix"
+                suffix++
+            }
+            used += candidate
+            candidate
+        }
     }
 
     private fun List<String>.padTo(width: Int): List<String> {

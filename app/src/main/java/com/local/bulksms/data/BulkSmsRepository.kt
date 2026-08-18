@@ -75,6 +75,10 @@ class BulkSmsRepository(
     /**
      * Atomically snapshots the current draft phone/body values into a new queue.
      * Subsequent draft edits cannot change these send items.
+     *
+     * Each draft expands into up to two items: one for the primary phone column and
+     * one for the backup phone column. Empty numbers are skipped, so a row with only
+     * one valid number produces exactly one message.
      */
     suspend fun freezeQueue(
         importId: String,
@@ -96,18 +100,32 @@ class BulkSmsRepository(
                     createdAt = clock(),
                 ),
             )
-            database.sendDao().insertItems(
-                drafts.mapIndexed { ordinal, draft ->
-                    SendItemEntity(
+            var ordinal = 0
+            val items = mutableListOf<SendItemEntity>()
+            for (draft in drafts) {
+                if (draft.phoneNumber.isNotBlank()) {
+                    items += SendItemEntity(
                         id = idFactory(),
                         taskId = taskId,
-                        ordinal = ordinal,
+                        ordinal = ordinal++,
                         phoneNumber = draft.phoneNumber,
                         body = draft.currentBody,
                         status = SendStatus.PENDING,
                     )
-                },
-            )
+                }
+                if (draft.backupPhoneNumber.isNotBlank()) {
+                    items += SendItemEntity(
+                        id = idFactory(),
+                        taskId = taskId,
+                        ordinal = ordinal++,
+                        phoneNumber = draft.backupPhoneNumber,
+                        body = draft.currentBody,
+                        status = SendStatus.PENDING,
+                    )
+                }
+            }
+            require(items.isNotEmpty()) { "选中的短信没有可用的电话号码" }
+            database.sendDao().insertItems(items)
             taskId
         }
 
