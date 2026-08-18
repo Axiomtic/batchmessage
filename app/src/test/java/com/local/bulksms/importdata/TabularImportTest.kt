@@ -59,15 +59,15 @@ class TabularImportTest {
     }
 
     @Test
-    fun duplicateHeadersBecomeUnique() {
+    fun headerTextBecomesColumnNamesAndDuplicatesBecomeUnique() {
         val raw = TabularTextParser.parse("姓名\t姓名\t\n张三\tA\t1")
         val table = HeaderDetector.materialize(raw, firstRowIsHeader = true)
 
-        assertEquals(listOf("A", "B", "C"), table.columns.map { it.name })
+        assertEquals(listOf("姓名", "姓名2", "C"), table.columns.map { it.name })
     }
 
     @Test
-    fun blankHeadersUseColumnNamesAndDoNotChangeDataCells() {
+    fun blankHeadersUseColumnAddressesAndDoNotChangeDataCells() {
         val raw = RawTable(
             rows = listOf(
                 listOf("", "姓名", "姓名_2", "姓名"),
@@ -77,7 +77,7 @@ class TabularImportTest {
 
         val table = HeaderDetector.materialize(raw, firstRowIsHeader = true)
 
-        assertEquals(listOf("A", "B", "C", "D"), table.columns.map { it.name })
+        assertEquals(listOf("A", "姓名", "姓名_2", "姓名2"), table.columns.map { it.name })
         assertEquals(listOf("001", "张三", "旧", "新"), table.rows.single().cells)
     }
 
@@ -94,7 +94,7 @@ class TabularImportTest {
         val table = HeaderDetector.materialize(raw, firstRowIsHeader = true)
 
         assertEquals(
-            listOf(DynamicColumn(0, "A"), DynamicColumn(1, "B")),
+            listOf(DynamicColumn(0, "手机号"), DynamicColumn(1, "姓名")),
             table.columns,
         )
         assertEquals(
@@ -106,6 +106,19 @@ class TabularImportTest {
         )
         assertTrue(table.firstRowIsHeader)
         assertEquals(null, table.phoneColumnIndex)
+    }
+
+    @Test
+    fun headerNamesAreTrimmedAndDuplicatesGetNumericSuffix() {
+        val raw = RawTable(
+            rows = listOf(
+                listOf("姓名", "姓名 ", "名字"),
+                listOf("张三", "李四", "王五"),
+            ),
+        )
+        // "姓名" and "姓名 " trim to the same name, so the second gets a suffix.
+        val table = HeaderDetector.materialize(raw, firstRowIsHeader = true)
+        assertEquals(listOf("姓名", "姓名2", "名字"), table.columns.map { it.name })
     }
 
     @Test

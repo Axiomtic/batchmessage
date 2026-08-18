@@ -56,7 +56,33 @@ class DataScreenTest {
         composeRule.onNodeWithTag("row-label-1").performTouchInput { longClick() }
         composeRule.onNodeWithText("删除第 2 行？").assertExists()
         composeRule.onNodeWithText("取消").performClick()
-        composeRule.onNodeWithTag("column-label-B").performTouchInput { longClick() }
-        composeRule.onNodeWithText("删除第 B 列？").assertExists()
+        composeRule.onNodeWithTag("column-label-电话").performTouchInput { longClick() }
+        composeRule.onNodeWithText("删除第 电话 列？").assertExists()
+    }
+
+    @Test
+    fun clickingColumnHeaderOpensColumnRoleMenu() {
+        var primarySelected: Int? = null
+        var backupSelected: Int? = null
+        val state = SendFlowViewModel().state.value
+        composeRule.setContent {
+            MaterialTheme {
+                DataScreen(
+                    state = state,
+                    callbacks = BulkSmsCallbacks(
+                        onPhoneColumnSelected = { primarySelected = it },
+                        onBackupPhoneColumnSelected = { backupSelected = it },
+                    ),
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("column-label-服务到期日期").performClick()
+        composeRule.onNodeWithText("设为主电话号码列").performClick()
+        composeRule.runOnIdle { assertEquals(2, primarySelected) }
+
+        composeRule.onNodeWithTag("column-label-服务到期日期").performClick()
+        composeRule.onNodeWithText("设为备用电话号码列").performClick()
+        composeRule.runOnIdle { assertEquals(2, backupSelected) }
     }
 }

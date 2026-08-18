@@ -41,12 +41,33 @@ class MessageReviewScreenTest {
             }
         }
 
-        composeRule.onNodeWithText("13800138000").assertExists()
+        composeRule.onNodeWithText("1 · 主:13800138000").assertExists()
         composeRule.onNodeWithText("138****8000").assertDoesNotExist()
         composeRule.onNodeWithText("张三您好，金额120").assertExists()
         composeRule.onNodeWithTag("message-body-7").assertDoesNotExist()
         composeRule.onNodeWithTag("send-draft-7").performClick()
         assertEquals(7L to false, selectionChange)
+    }
+
+    @Test
+    fun previewShowsBackupNumberWhenPresent() {
+        val draft = first.copy(
+            backupPhoneNumber = "13900139000",
+            backupPhoneColumnIndex = 1,
+        )
+        composeRule.setContent {
+            MaterialTheme {
+                MessageReviewList(
+                    drafts = listOf(draft),
+                    selectedRowIds = emptySet(),
+                    enabled = true,
+                    onSelectionChanged = { _, _ -> },
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("1 · 主:13800138000").assertExists()
+        composeRule.onNodeWithText("备:13900139000").assertExists()
     }
 
     @Test

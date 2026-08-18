@@ -13,7 +13,7 @@ class SendFlowViewModelTest {
     fun defaultStateStartsWithThreeColumnsFiveRowsAndGeneratedDrafts() {
         val state = SendFlowViewModel().state.value
 
-        assertEquals(listOf("A", "B", "C"), state.table?.columns?.map { it.name })
+        assertEquals(listOf("名字", "电话", "服务到期日期"), state.table?.columns?.map { it.name })
         assertEquals(5, state.table?.rows?.size)
         assertEquals(1, state.selectedPhoneColumn)
         assertEquals(2, state.drafts.size)
@@ -68,7 +68,7 @@ class SendFlowViewModelTest {
         val state = viewModel.state.value
 
         assertEquals(6, state.table?.rows?.size)
-        assertEquals(listOf("A", "B", "C", "D"), state.table?.columns?.map { it.name })
+        assertEquals(listOf("名字", "电话", "服务到期日期", "4"), state.table?.columns?.map { it.name })
         viewModel.editCell(5L, 3, "现场输入")
         assertEquals("现场输入", viewModel.state.value.table?.rows?.last()?.cells?.last())
     }
@@ -106,7 +106,7 @@ class SendFlowViewModelTest {
         viewModel.unsyncAllDrafts()
         val protectedBodies = viewModel.state.value.drafts.map { it.currentBody }
 
-        viewModel.updateTemplateBody("{A}的新提醒")
+        viewModel.updateTemplateBody("{名字}的新提醒")
 
         assertEquals(protectedBodies, viewModel.state.value.drafts.map { it.currentBody })
         viewModel.syncAllDrafts()
@@ -118,7 +118,7 @@ class SendFlowViewModelTest {
     fun manualDraftEditIsProtectedUntilSyncIsReenabled() {
         val viewModel = SendFlowViewModel()
         viewModel.importClipboard("手机号\t姓名\t金额\n13800138000\t张三\t100")
-        viewModel.selectTemplate("template-1", "{B}您好，金额{C}")
+        viewModel.selectTemplate("template-1", "{姓名}您好，金额{金额}")
 
         viewModel.editDraft(0L, "张三您好，已延期")
         viewModel.editCell(0L, 2, "200")
@@ -165,7 +165,7 @@ class SendFlowViewModelTest {
         val state = viewModel.state.value
         assertEquals(true, state.detectedHeader)
         assertEquals(true, state.table?.firstRowIsHeader)
-        assertEquals(listOf("A", "B"), state.table?.columns?.map { it.name })
+        assertEquals(listOf("手机号", "姓名"), state.table?.columns?.map { it.name })
         assertEquals(1, state.table?.rows?.size)
     }
 
@@ -203,8 +203,76 @@ class SendFlowViewModelTest {
 
         viewModel.deleteColumn(1)
 
-        assertEquals(listOf("A", "B"), viewModel.state.value.table?.columns?.map { it.name })
+        assertEquals(listOf("名字", "服务到期日期"), viewModel.state.value.table?.columns?.map { it.name })
         assertNull(viewModel.state.value.selectedPhoneColumn)
         assertNull(viewModel.state.value.table?.phoneColumnIndex)
+    }
+
+    @Test
+    fun backupPhoneColumnCanBeSelectedAndRendersBackupNumberInDrafts() {
+        val viewModel = SendFlowViewModel()
+        viewModel.importClipboard("手机号\t备用手机号\t姓名\n13800138000\t13900139000\t张三")
+        viewModel.selectTemplate("template-1", "{姓名}您好")
+        viewModel.selectPhoneColumn(0)
+
+        viewModel.selectBackupPhoneColumn(1)
+
+        val state = viewModel.state.value
+        assertEquals(0, state.selectedPhoneColumn)
+        assertEquals(1, state.selectedBackupPhoneColumn)
+        assertEquals(1, state.table?.backupPhoneColumnIndex)
+        assertEquals("13900139000", state.drafts.single().backupPhoneNumber)
+        assertEquals(1, state.drafts.single().backupPhoneColumnIndex)
+    }
+
+    @Test
+    fun selectingPrimaryColumnThatWasBackupClearsTheBackupRole() {
+        val viewModel = SendFlowViewModel()
+        viewModel.importClipboard("手机号\t备用手机号\n13800138000\t13900139000")
+        viewModel.selectPhoneColumn(0)
+        viewModel.selectBackupPhoneColumn(1)
+
+        viewModel.selectPhoneColumn(1)
+
+        assertEquals(1, viewModel.state.value.selectedPhoneColumn)
+        assertNull(viewModel.state.value.selectedBackupPhoneColumn)
+        assertNull(viewModel.state.value.table?.backupPhoneColumnIndex)
+    }
+
+    @Test
+    fun backupColumnCannotBeTheSameAsThePrimaryColumn() {
+        val viewModel = SendFlowViewModel()
+        viewModel.importClipboard("手机号\t备用手机号\n13800138000\t13900139000")
+        viewModel.selectPhoneColumn(0)
+
+        viewModel.selectBackupPhoneColumn(0)
+
+        assertNull(viewModel.state.value.selectedBackupPhoneColumn)
+    }
+
+    @Test
+    fun deletingBackupColumnClearsBackupSelectionButKeepsPrimary() {
+        val viewModel = SendFlowViewModel()
+        viewModel.importClipboard("手机号\t备用手机号\t姓名\n13800138000\t13900139000\t张三")
+        viewModel.selectPhoneColumn(0)
+        viewModel.selectBackupPhoneColumn(1)
+
+        viewModel.deleteColumn(1)
+
+        val state = viewModel.state.value
+        assertEquals(0, state.selectedPhoneColumn)
+        assertNull(state.selectedBackupPhoneColumn)
+        assertEquals(listOf("手机号", "姓名"), state.table?.columns?.map { it.name })
+    }
+
+    @Test
+    fun headerTextFieldsAreUsedDirectlyInTemplates() {
+        val viewModel = SendFlowViewModel()
+        viewModel.importClipboard("手机号\t姓名\t到期\n13800138000\t张三\t2027-01-01")
+
+        viewModel.selectTemplate("template-1", "{姓名}，您的服务到期日是{到期}")
+
+        val draft = viewModel.state.value.drafts.single()
+        assertEquals("张三，您的服务到期日是2027-01-01", draft.currentBody)
     }
 }

@@ -21,6 +21,7 @@ import androidx.compose.ui.text.AnnotatedString
 import com.local.bulksms.data.TemplateEntity
 import com.local.bulksms.model.DynamicColumn
 import com.local.bulksms.model.ImportedTable
+import com.local.bulksms.sms.SimOption
 import com.local.bulksms.ui.BulkSmsCallbacks
 import com.local.bulksms.ui.template.TemplateUiState
 import org.junit.Assert.assertEquals
@@ -135,20 +136,12 @@ class SmsScreenTest {
     }
 
     @Test
-    fun phoneColumnCanBeSelectedFromTemplateSection() {
-        var selectedColumn: Int? = null
+    fun simCanBeSelectedFromSendPage() {
+        var selectedSubscription: Int? = null
         val state = SendFlowViewModel().state.value.copy(
-            table = ImportedTable(
-                columns = listOf(
-                    DynamicColumn(0, "A"),
-                    DynamicColumn(1, "B"),
-                    DynamicColumn(2, "C"),
-                ),
-                rows = emptyList(),
-                firstRowIsHeader = false,
-                phoneColumnIndex = 1,
-            ),
-            selectedPhoneColumn = 1,
+            simOptions = listOf(SimOption(7, "SIM 1", 0), SimOption(9, "SIM 2", 1)),
+            simDetectionState = SimDetectionState.AVAILABLE,
+            selectedSubscriptionId = 7,
         )
 
         composeRule.setContent {
@@ -163,16 +156,47 @@ class SmsScreenTest {
                         savedBody = template.body,
                     ),
                     callbacks = BulkSmsCallbacks(
-                        onPhoneColumnSelected = { selectedColumn = it },
+                        onSubscriptionSelected = { selectedSubscription = it },
                     ),
                 )
             }
         }
 
-        composeRule.onNodeWithTag("template-phone-column").performClick()
-        composeRule.onNodeWithText("C 列").performClick()
+        composeRule.onNodeWithTag("sim-selector").performClick()
+        composeRule.onNodeWithText("SIM 2").performClick()
 
-        composeRule.runOnIdle { assertEquals(2, selectedColumn) }
+        composeRule.runOnIdle { assertEquals(9, selectedSubscription) }
+    }
+
+    @Test
+    fun missingSimPermissionShowsGrantActionOnSendPage() {
+        var permissionRequested = false
+        val state = SendFlowViewModel().state.value.copy(
+            simOptions = emptyList(),
+            simDetectionState = SimDetectionState.PERMISSION_REQUIRED,
+        )
+
+        composeRule.setContent {
+            MaterialTheme {
+                SmsScreen(
+                    state = state,
+                    templateState = TemplateUiState(
+                        templates = listOf(template),
+                        selectedTemplateId = template.id,
+                        editorName = template.name,
+                        editorBody = template.body,
+                        savedBody = template.body,
+                    ),
+                    callbacks = BulkSmsCallbacks(
+                        onRequestSimPermission = { permissionRequested = true },
+                    ),
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("需要电话权限才能读取 SIM").assertExists()
+        composeRule.onNodeWithTag("grant-sim-permission").performClick()
+        composeRule.runOnIdle { assertEquals(true, permissionRequested) }
     }
 
     @Test
