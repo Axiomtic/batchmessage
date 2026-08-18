@@ -153,13 +153,36 @@ class AppDatabaseTest {
             ),
         )
 
-        val taskId = repository.freezeQueue(importId, simSubscriptionId = 7)
+        val taskId = repository.freezeQueue(importId, simSubscriptionId = 7, selectedRowIds = setOf(10L))
         val items = database.sendDao().items(taskId).first()
 
         assertEquals(1, items.size)
         assertEquals("13800138000", items.single().phoneNumber)
         assertEquals("张三您好，金额120", items.single().body)
         assertEquals(SendStatus.PENDING, items.single().status)
+    }
+
+    @Test
+    fun freezeQueueCopiesOnlySelectedDrafts() = runTest {
+        fun draft(rowId: Long, phone: String) = MessageDraft(
+            rowId = rowId,
+            phoneNumber = phone,
+            generatedBody = "正文$rowId",
+            currentBody = "正文$rowId",
+            columnNames = listOf("手机号"),
+            phoneColumnIndex = 0,
+        )
+        repository.saveDrafts(
+            "import-1",
+            listOf(draft(1L, "13800138000"), draft(2L, "13900139000")),
+        )
+
+        val taskId = repository.freezeQueue("import-1", 7, setOf(2L))
+
+        assertEquals(
+            listOf("13900139000"),
+            database.sendDao().itemsOnce(taskId).map { it.phoneNumber },
+        )
     }
 
     @Test

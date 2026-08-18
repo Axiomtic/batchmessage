@@ -18,10 +18,11 @@ data class TemplateUiState(
     val selectedTemplateId: String? = null,
     val editorName: String = "",
     val editorBody: String = "",
+    val savedName: String = editorName,
     val savedBody: String = "",
     val validationError: String? = null,
 ) {
-    val isDirty: Boolean get() = editorBody != savedBody
+    val isDirty: Boolean get() = editorName != savedName || editorBody != savedBody
 }
 
 class TemplateViewModel(
@@ -51,6 +52,7 @@ class TemplateViewModel(
                 selectedTemplateId = id,
                 editorName = template?.name.orEmpty(),
                 editorBody = template?.body.orEmpty(),
+                savedName = template?.name.orEmpty(),
                 savedBody = template?.body.orEmpty(),
             )
         }
@@ -62,6 +64,7 @@ class TemplateViewModel(
                 selectedTemplateId = null,
                 editorName = "",
                 editorBody = "",
+                savedName = "",
                 savedBody = "",
                 validationError = null,
             )
@@ -92,7 +95,12 @@ class TemplateViewModel(
             updatedAt = now,
         )
         mutableState.update {
-            it.copy(selectedTemplateId = template.id, savedBody = template.body, validationError = null)
+            it.copy(
+                selectedTemplateId = template.id,
+                savedName = template.name,
+                savedBody = template.body,
+                validationError = null,
+            )
         }
         workScope.launch { saveTemplate(template) }
     }
@@ -115,6 +123,7 @@ class TemplateViewModel(
                 selectedTemplateId = created.id,
                 editorName = created.name,
                 editorBody = "",
+                savedName = created.name,
                 savedBody = "",
                 validationError = null,
             )
@@ -135,7 +144,9 @@ class TemplateViewModel(
             body = current.editorBody,
             updatedAt = clock(),
         )
-        mutableState.update { it.copy(savedBody = updated.body, validationError = null) }
+        mutableState.update {
+            it.copy(savedName = updated.name, savedBody = updated.body, validationError = null)
+        }
         workScope.launch { saveTemplate(updated) }
         return updated
     }
@@ -150,6 +161,7 @@ class TemplateViewModel(
                 selectedTemplateId = next.id,
                 editorName = next.name,
                 editorBody = next.body,
+                savedName = next.name,
                 savedBody = next.body,
                 validationError = null,
             )
@@ -174,7 +186,9 @@ class TemplateViewModel(
             body = current.editorBody,
             updatedAt = clock(),
         )
-        mutableState.update { it.copy(savedBody = updated.body, validationError = null) }
+        mutableState.update {
+            it.copy(savedName = updated.name, savedBody = updated.body, validationError = null)
+        }
         workScope.launch { saveTemplate(updated) }
     }
 
@@ -196,6 +210,7 @@ class TemplateViewModel(
             it.copy(
                 selectedTemplateId = created.id,
                 editorName = created.name,
+                savedName = created.name,
                 savedBody = created.body,
                 validationError = null,
             )
@@ -211,6 +226,7 @@ class TemplateViewModel(
                     selectedTemplateId = null,
                     editorName = "",
                     editorBody = "",
+                    savedName = "",
                     savedBody = "",
                 )
             } else {

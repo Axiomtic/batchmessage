@@ -24,6 +24,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
+import com.local.bulksms.ui.theme.neutralOutlinedTextFieldColors
 
 @Composable
 fun TemplateScreen(
@@ -87,6 +88,7 @@ fun TemplateScreen(
             modifier = Modifier.fillMaxWidth(),
             label = { Text("模板名称") },
             singleLine = true,
+            colors = neutralOutlinedTextFieldColors(),
         )
         OutlinedTextField(
             value = bodyValue,
@@ -99,6 +101,7 @@ fun TemplateScreen(
                 .testTag("template-body"),
             label = { Text("短信正文") },
             minLines = 5,
+            colors = neutralOutlinedTextFieldColors(),
         )
         Text("可用变量", style = MaterialTheme.typography.labelLarge)
         Row(

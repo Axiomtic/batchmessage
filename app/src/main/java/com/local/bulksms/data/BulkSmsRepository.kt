@@ -76,10 +76,17 @@ class BulkSmsRepository(
      * Atomically snapshots the current draft phone/body values into a new queue.
      * Subsequent draft edits cannot change these send items.
      */
-    suspend fun freezeQueue(importId: String, simSubscriptionId: Int): String =
+    suspend fun freezeQueue(
+        importId: String,
+        simSubscriptionId: Int,
+        selectedRowIds: Set<Long>,
+    ): String =
         database.withTransaction {
+            require(selectedRowIds.isNotEmpty()) { "至少选择一条短信" }
             val drafts = database.draftDao().byImportOnce(importId)
+                .filter { it.rowId in selectedRowIds }
                 .sortedWith(compareBy<MessageDraftEntity> { it.rowId }.thenBy { it.id })
+            require(drafts.isNotEmpty()) { "选中的短信不存在" }
             val taskId = idFactory()
             database.sendDao().insertTask(
                 SendTaskEntity(

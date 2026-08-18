@@ -25,6 +25,21 @@ class TabularImportTest {
     }
 
     @Test
+    fun fourConsecutiveSpacesSeparateClipboardCellsLikeATab() {
+        val raw = TabularTextParser.parse(
+            "姓名    电话    到期日期\n张三    13800138000    2027-01-01",
+        )
+
+        assertEquals(
+            listOf(
+                listOf("姓名", "电话", "到期日期"),
+                listOf("张三", "13800138000", "2027-01-01"),
+            ),
+            raw.rows,
+        )
+    }
+
+    @Test
     fun parserRejectsClipboardWithoutRows() {
         val failure = assertThrows(IllegalArgumentException::class.java) {
             TabularTextParser.parse("\r\n \t \n")

@@ -14,11 +14,14 @@ import com.local.bulksms.model.MessageDraft
 import com.local.bulksms.model.RawTable
 import com.local.bulksms.model.WorkspaceSnapshot
 import com.local.bulksms.sms.SimOption
+import com.local.bulksms.sms.DEFAULT_SEND_INTERVAL_MILLIS
+import com.local.bulksms.sms.MAX_SEND_INTERVAL_MILLIS
 import com.local.bulksms.template.DraftSynchronizer
 import com.local.bulksms.template.TemplateRenderer
 import java.io.InputStream
 import java.util.UUID
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -28,6 +31,14 @@ data class PendingImport(
     val rawTable: RawTable,
     val detectedHeader: Boolean,
 )
+
+enum class SimDetectionState {
+    PERMISSION_REQUIRED,
+    LOADING,
+    AVAILABLE,
+    EMPTY,
+    ERROR,
+}
 
 data class SendFlowUiState(
     val rawTable: RawTable? = null,
@@ -42,10 +53,16 @@ data class SendFlowUiState(
     val selectedTemplateBody: String? = null,
     val templates: List<TemplateEntity> = emptyList(),
     val drafts: List<MessageDraft> = emptyList(),
+    val selectedDraftRowIds: Set<Long> = emptySet(),
     val missingTemplateVariables: Set<String> = emptySet(),
     val simOptions: List<SimOption> = emptyList(),
+    val simDetectionState: SimDetectionState = SimDetectionState.PERMISSION_REQUIRED,
+    val simDetectionError: String? = null,
     val selectedSubscriptionId: Int? = null,
     val pendingImport: PendingImport? = null,
+    val sendProgress: SendProgressUiState? = null,
+    val sendIntervalMillis: Long = DEFAULT_SEND_INTERVAL_MILLIS,
+    val workspaceReady: Boolean = true,
 )
 
 class SendFlowViewModel(
@@ -55,7 +72,10 @@ class SendFlowViewModel(
     initialWorkspace: WorkspaceSnapshot = WorkspaceSnapshot.sample(),
 ) : ViewModel() {
     private val persistenceChannel = Channel<SendFlowUiState>(Channel.CONFLATED)
-    private val mutableState = MutableStateFlow(stateFromWorkspace(initialWorkspace))
+    private var sendProgressJob: Job? = null
+    private val mutableState = MutableStateFlow(
+        stateFromWorkspace(initialWorkspace).copy(workspaceReady = repository == null),
+    )
     val state: StateFlow<SendFlowUiState> = mutableState.asStateFlow()
 
     init {
@@ -71,10 +91,11 @@ class SendFlowViewModel(
             viewModelScope.launch {
                 val workspace = targetRepository.loadOrCreateWorkspace()
                 val restoredDrafts = targetRepository.loadDraftsOnce(workspace.importId)
-                val restored = stateFromWorkspace(workspace)
-                mutableState.value = restored.copy(
-                    drafts = restoredDrafts.ifEmpty { restored.drafts },
+                val restored = stateFromWorkspace(workspace).copy(
+                    sendIntervalMillis = mutableState.value.sendIntervalMillis,
+                    workspaceReady = true,
                 )
+                mutableState.value = restored.replaceDrafts(restoredDrafts.ifEmpty { restored.drafts })
                 if (restoredDrafts.isEmpty()) schedulePersistence(mutableState.value)
             }
             viewModelScope.launch {
@@ -97,6 +118,10 @@ class SendFlowViewModel(
     fun requestXlsxImport(input: InputStream) =
         importRaw(importer = { xlsxImporter.import(input) }, requireConfirmation = true)
 
+    fun reportImportError(message: String) = updateState {
+        it.copy(pendingImport = null, blockingError = message)
+    }
+
     fun confirmPendingImport() {
         val pending = mutableState.value.pendingImport ?: return
         applyImportedRaw(pending.rawTable, pending.detectedHeader)
@@ -118,9 +143,32 @@ class SendFlowViewModel(
             current.copy(
                 selectedPhoneColumn = columnIndex,
                 table = updatedTable,
-                drafts = refreshDrafts(current, updatedTable),
+            ).replaceDrafts(refreshDrafts(current, updatedTable))
+        }
+    }
+
+    fun toggleDraftSelection(rowId: Long, selected: Boolean) {
+        val current = mutableState.value
+        if (current.drafts.none { it.rowId == rowId }) return
+        updateState {
+            current.copy(
+                selectedDraftRowIds = if (selected) {
+                    current.selectedDraftRowIds + rowId
+                } else {
+                    current.selectedDraftRowIds - rowId
+                },
             )
         }
+    }
+
+    fun selectAllDrafts(selected: Boolean) = updateState { current ->
+        current.copy(
+            selectedDraftRowIds = if (selected) {
+                current.drafts.mapTo(mutableSetOf()) { it.rowId }
+            } else {
+                emptySet()
+            },
+        )
     }
 
     fun setSimOptions(options: List<SimOption>) {
@@ -128,13 +176,109 @@ class SendFlowViewModel(
         val selected = current.selectedSubscriptionId?.takeIf { id ->
             options.any { it.subscriptionId == id }
         } ?: options.singleOrNull()?.subscriptionId
-        updateState { current.copy(simOptions = options, selectedSubscriptionId = selected) }
+        updateState {
+            current.copy(
+                simOptions = options,
+                selectedSubscriptionId = selected,
+                simDetectionState = if (options.isEmpty()) SimDetectionState.EMPTY else SimDetectionState.AVAILABLE,
+                simDetectionError = null,
+            )
+        }
+    }
+
+    fun setSimPermissionRequired() = updateState {
+        it.copy(
+            simOptions = emptyList(),
+            simDetectionState = SimDetectionState.PERMISSION_REQUIRED,
+            simDetectionError = null,
+        )
+    }
+
+    fun setSimLoading() = updateState {
+        it.copy(
+            simOptions = emptyList(),
+            simDetectionState = SimDetectionState.LOADING,
+            simDetectionError = null,
+        )
+    }
+
+    fun setSimDetectionError(message: String) = updateState {
+        it.copy(
+            simOptions = emptyList(),
+            simDetectionState = SimDetectionState.ERROR,
+            simDetectionError = message,
+        )
     }
 
     fun selectSubscription(subscriptionId: Int) {
         val current = mutableState.value
         if (current.simOptions.none { it.subscriptionId == subscriptionId }) return
         updateState { current.copy(selectedSubscriptionId = subscriptionId) }
+    }
+
+    fun setSendInterval(intervalMillis: Long) = updateState {
+        it.copy(sendIntervalMillis = intervalMillis.coerceIn(0L, MAX_SEND_INTERVAL_MILLIS))
+    }
+
+    suspend fun createSelectedSendTask(): String? {
+        val current = mutableState.value
+        val selectedDrafts = current.drafts.filter { it.rowId in current.selectedDraftRowIds }
+        if (selectedDrafts.isEmpty()) {
+            updateState { current.copy(blockingError = "请至少选择一条短信") }
+            return null
+        }
+        if (current.selectedPhoneColumn == null) {
+            updateState { current.copy(blockingError = "请先选择电话号码列") }
+            return null
+        }
+        if (selectedDrafts.any { it.phoneNumber.isBlank() }) {
+            updateState { current.copy(blockingError = "选中的短信包含空电话号码") }
+            return null
+        }
+        val subscriptionId = current.selectedSubscriptionId
+        if (subscriptionId == null || current.simOptions.none { it.subscriptionId == subscriptionId }) {
+            updateState { current.copy(blockingError = "请先选择可用的发送 SIM") }
+            return null
+        }
+        val targetRepository = repository
+        val importId = current.importId
+        if (targetRepository == null || importId == null) {
+            updateState { current.copy(blockingError = "发送存储尚未就绪") }
+            return null
+        }
+        targetRepository.saveDrafts(importId, current.drafts)
+        val taskId = targetRepository.freezeQueue(
+            importId = importId,
+            simSubscriptionId = subscriptionId,
+            selectedRowIds = current.selectedDraftRowIds,
+        )
+        mutableState.value = current.copy(
+            blockingError = null,
+            sendProgress = SendProgressUiState(
+                total = selectedDrafts.size,
+                processed = 0,
+                succeeded = 0,
+                failed = 0,
+                running = true,
+            ),
+        )
+        return taskId
+    }
+
+    fun observeSendTask(taskId: String) {
+        val targetRepository = repository ?: return
+        sendProgressJob?.cancel()
+        sendProgressJob = viewModelScope.launch {
+            targetRepository.sendDao.items(taskId).collect { items ->
+                mutableState.value = mutableState.value.copy(
+                    sendProgress = SendProgressUiState.from(items.map { it.status }),
+                )
+            }
+        }
+    }
+
+    fun setSendPermissionDenied() = updateState {
+        it.copy(blockingError = "需要短信权限才能发送")
     }
 
     fun selectTemplate(templateId: String, body: String, name: String = templateId) {
@@ -148,10 +292,11 @@ class SendFlowViewModel(
         )
         updateState {
             withTemplate.copy(
-                drafts = if (missing.isEmpty()) refreshDrafts(withTemplate, table) else current.drafts,
                 missingTemplateVariables = missing,
                 blockingError = missing.takeIf { it.isNotEmpty() }
                     ?.let { "模板包含不存在的变量：${it.joinToString("、")}" },
+            ).replaceDrafts(
+                if (missing.isEmpty()) refreshDrafts(withTemplate, table) else current.drafts,
             )
         }
     }
@@ -210,9 +355,10 @@ class SendFlowViewModel(
         val withBody = current.copy(selectedTemplateBody = body)
         updateState {
             withBody.copy(
-                drafts = if (missing.isEmpty()) refreshDrafts(withBody, table) else current.drafts,
                 missingTemplateVariables = missing,
                 blockingError = missing.toTemplateError(),
+            ).replaceDrafts(
+                if (missing.isEmpty()) refreshDrafts(withBody, table) else current.drafts,
             )
         }
     }
@@ -403,9 +549,8 @@ class SendFlowViewModel(
                         importWarnings = raw.warnings,
                         blockingError = null,
                         importId = idFactory(),
-                        drafts = refreshDrafts(current, table),
                         pendingImport = null,
-                    )
+                    ).replaceDrafts(refreshDrafts(current, table))
                 }
             },
             onFailure = { error -> updateState { it.copy(blockingError = error.message ?: "无法处理数据") } },
@@ -422,9 +567,8 @@ class SendFlowViewModel(
                     current.copy(
                         table = table,
                         selectedPhoneColumn = phoneColumn,
-                        drafts = refreshDrafts(current, table),
                         blockingError = null,
-                    )
+                    ).replaceDrafts(refreshDrafts(current, table))
                 }
             },
             onFailure = { error -> updateState { it.copy(blockingError = error.message ?: "无法处理数据") } },
@@ -446,9 +590,8 @@ class SendFlowViewModel(
                         rawTable = updatedRaw,
                         table = table,
                         selectedPhoneColumn = selectedPhone,
-                        drafts = refreshDrafts(current, table),
                         blockingError = null,
-                    )
+                    ).replaceDrafts(refreshDrafts(current, table))
                 }
             },
             onFailure = { error -> updateState { it.copy(blockingError = error.message ?: "无法处理数据") } },
@@ -468,6 +611,15 @@ class SendFlowViewModel(
         }
         val detached = current.drafts.filter { !it.syncWithTable && it.rowId !in rowIds }
         return refreshed + detached
+    }
+
+    private fun SendFlowUiState.replaceDrafts(newDrafts: List<MessageDraft>): SendFlowUiState {
+        val oldIds = drafts.mapTo(mutableSetOf()) { it.rowId }
+        val newIds = newDrafts.mapTo(mutableSetOf()) { it.rowId }
+        return copy(
+            drafts = newDrafts,
+            selectedDraftRowIds = reconcileDraftSelection(oldIds, selectedDraftRowIds, newIds),
+        )
     }
 
     private fun updateState(transform: (SendFlowUiState) -> SendFlowUiState) {
@@ -523,6 +675,7 @@ class SendFlowViewModel(
                 selectedTemplateName = workspace.selectedTemplateName,
                 selectedTemplateBody = workspace.selectedTemplateBody,
                 drafts = drafts,
+                selectedDraftRowIds = drafts.mapTo(mutableSetOf()) { it.rowId },
                 missingTemplateVariables = missing,
                 blockingError = missing.takeIf { it.isNotEmpty() }
                     ?.let { "模板包含不存在的变量：${it.joinToString("、")}" },

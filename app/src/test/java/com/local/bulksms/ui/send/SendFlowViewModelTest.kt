@@ -1,9 +1,11 @@
 package com.local.bulksms.ui.send
 
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SendFlowViewModelTest {
@@ -15,9 +17,45 @@ class SendFlowViewModelTest {
         assertEquals(5, state.table?.rows?.size)
         assertEquals(1, state.selectedPhoneColumn)
         assertEquals(2, state.drafts.size)
+        assertEquals(state.drafts.mapTo(mutableSetOf()) { it.rowId }, state.selectedDraftRowIds)
         assertEquals(
             "您好，张三，您的服务将于2026-09-30到期，请及时办理续期。如已办理，请忽略本短信。",
             state.drafts.first().currentBody,
+        )
+    }
+
+    @Test
+    fun draftSelectionCanBeClearedAndRestoredIndividually() {
+        val viewModel = SendFlowViewModel()
+        val firstRowId = viewModel.state.value.drafts.first().rowId
+
+        viewModel.selectAllDrafts(false)
+        assertTrue(viewModel.state.value.selectedDraftRowIds.isEmpty())
+
+        viewModel.toggleDraftSelection(firstRowId, true)
+        assertEquals(setOf(firstRowId), viewModel.state.value.selectedDraftRowIds)
+    }
+
+    @Test
+    fun creatingSendTaskRequiresAtLeastOneSelectedDraft() = runTest {
+        val viewModel = SendFlowViewModel()
+        viewModel.selectAllDrafts(false)
+
+        assertNull(viewModel.createSelectedSendTask())
+        assertEquals("请至少选择一条短信", viewModel.state.value.blockingError)
+    }
+
+    @Test
+    fun newlyGeneratedDraftIsSelectedWithoutReselectingExistingDraft() {
+        val viewModel = SendFlowViewModel()
+        val existingIds = viewModel.state.value.drafts.map { it.rowId }
+        viewModel.toggleDraftSelection(existingIds.last(), false)
+
+        viewModel.editCell(rowId = 2L, columnIndex = 0, value = "王五")
+
+        assertEquals(
+            setOf(existingIds.first(), 2L),
+            viewModel.state.value.selectedDraftRowIds,
         )
     }
 

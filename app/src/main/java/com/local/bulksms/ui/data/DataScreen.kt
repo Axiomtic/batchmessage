@@ -12,7 +12,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -25,9 +27,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.local.bulksms.ui.BulkSmsCallbacks
+import com.local.bulksms.ui.icons.BulkSmsIcons
 import com.local.bulksms.ui.send.EditableTable
 import com.local.bulksms.ui.send.SendFlowUiState
 
@@ -56,7 +60,6 @@ fun DataScreen(
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Text("数据", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
         Text("导入数据", style = MaterialTheme.typography.titleMedium)
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -65,12 +68,14 @@ fun DataScreen(
             ImportCard(
                 label = "文件",
                 hint = "Excel .xlsx",
+                iconRes = BulkSmsIcons.File,
                 modifier = Modifier.weight(1f).testTag("import-file"),
                 onClick = { fileLauncher.launch(arrayOf(XLSX_MIME)) },
             )
             ImportCard(
                 label = "剪贴板",
                 hint = "粘贴表格数据",
+                iconRes = BulkSmsIcons.Clipboard,
                 modifier = Modifier.weight(1f).testTag("import-clipboard"),
                 onClick = {
                     val clipboard = context.getSystemService(ClipboardManager::class.java)
@@ -124,7 +129,7 @@ fun DataScreen(
         AlertDialog(
             onDismissRequest = callbacks.onCancelImport,
             title = { Text("覆盖现有数据？") },
-            text = { Text("导入会替换当前表格；已取消同步的短信会保持不变。") },
+            text = { Text("导入会替换当前表格，并重新生成短信预览。") },
             dismissButton = { TextButton(onClick = callbacks.onCancelImport) { Text("取消") } },
             confirmButton = { Button(onClick = callbacks.onConfirmImport) { Text("覆盖并导入") } },
         )
@@ -159,15 +164,28 @@ fun DataScreen(
 private fun ImportCard(
     label: String,
     hint: String,
+    iconRes: Int,
     modifier: Modifier,
     onClick: () -> Unit,
 ) {
-    ElevatedCard(onClick = onClick, modifier = modifier.height(84.dp)) {
+    ElevatedCard(
+        onClick = onClick,
+        modifier = modifier.height(84.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+    ) {
         Column(
             modifier = Modifier.fillMaxSize().padding(horizontal = 14.dp),
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
+            Icon(
+                painter = painterResource(iconRes),
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+            )
             Text(label, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
             Text(hint, style = MaterialTheme.typography.labelSmall)
         }

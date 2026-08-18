@@ -77,7 +77,10 @@ interface DraftDao {
 @Dao
 interface SendDao {
     @Query("SELECT * FROM send_tasks WHERE id = :id")
-    suspend fun task(id: String): SendTaskEntity?
+    fun task(id: String): Flow<SendTaskEntity?>
+
+    @Query("SELECT * FROM send_tasks WHERE id = :id")
+    suspend fun taskOnce(id: String): SendTaskEntity?
 
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertTask(task: SendTaskEntity)

@@ -24,17 +24,13 @@ class SimSubscriptionProvider(private val source: SubscriptionSource) {
     constructor(context: Context) : this(
         SubscriptionSource {
             val manager = context.getSystemService(SubscriptionManager::class.java)
-            try {
-                manager.activeSubscriptionInfoList.orEmpty().map { info ->
-                    SubscriptionSnapshot(
-                        subscriptionId = info.subscriptionId,
-                        displayName = info.displayName?.toString().orEmpty(),
-                        carrierName = info.carrierName?.toString().orEmpty(),
-                        slotIndex = info.simSlotIndex,
-                    )
-                }
-            } catch (_: SecurityException) {
-                emptyList()
+            manager.activeSubscriptionInfoList.orEmpty().map { info ->
+                SubscriptionSnapshot(
+                    subscriptionId = info.subscriptionId,
+                    displayName = info.displayName?.toString().orEmpty(),
+                    carrierName = info.carrierName?.toString().orEmpty(),
+                    slotIndex = info.simSlotIndex,
+                )
             }
         },
     )

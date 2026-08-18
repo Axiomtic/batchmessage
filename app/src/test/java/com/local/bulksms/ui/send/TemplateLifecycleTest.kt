@@ -15,6 +15,24 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class TemplateLifecycleTest {
     @Test
+    fun changingTemplateNameMarksItDirtyAndSaveResetsDirtyState() = runTest {
+        val defaultTemplate = TemplateEntity("default", "默认模板", "{A}正文")
+        val templates = MutableStateFlow(listOf(defaultTemplate))
+        val saved = mutableListOf<TemplateEntity>()
+        val viewModel = TemplateViewModel(templates, { saved += it }, {}, backgroundScope)
+        runCurrent()
+
+        viewModel.selectTemplate(defaultTemplate.id)
+        viewModel.setEditorName("到期提醒")
+
+        assertTrue(viewModel.state.value.isDirty)
+        assertEquals(defaultTemplate.id, viewModel.saveSelected()?.id)
+        runCurrent()
+        assertEquals("到期提醒", saved.single().name)
+        assertFalse(viewModel.state.value.isDirty)
+    }
+
+    @Test
     fun saveOnlyEnablesAfterBodyChangesAndResetsAfterSave() = runTest {
         val defaultTemplate = TemplateEntity("default", "默认模板", "{A}旧正文")
         val templates = MutableStateFlow(listOf(defaultTemplate))

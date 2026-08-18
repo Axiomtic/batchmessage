@@ -40,6 +40,7 @@ class DataScreenTest {
         composeRule.onNodeWithTag("add-row").performClick()
         assertEquals(1, addedColumns)
         assertEquals(1, addedRows)
+        composeRule.onNodeWithText("数据").assertDoesNotExist()
         composeRule.onNodeWithText("+ 行").assertDoesNotExist()
     }
 

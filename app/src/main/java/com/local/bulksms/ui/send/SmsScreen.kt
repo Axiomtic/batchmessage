@@ -1,6 +1,5 @@
 package com.local.bulksms.ui.send
 
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,15 +8,18 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
-import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -30,13 +32,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.local.bulksms.ui.BulkSmsCallbacks
 import com.local.bulksms.ui.components.RoundedActionIcon
 import com.local.bulksms.ui.components.RoundedActionKind
+import com.local.bulksms.ui.icons.BulkSmsIcons
 import com.local.bulksms.ui.template.TemplateUiState
+import com.local.bulksms.ui.theme.neutralOutlinedTextFieldColors
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SmsScreen(
     state: SendFlowUiState,
@@ -45,141 +51,272 @@ fun SmsScreen(
     modifier: Modifier = Modifier,
 ) {
     var templateMenuOpen by remember { mutableStateOf(false) }
+    var phoneColumnMenuOpen by remember { mutableStateOf(false) }
     var showCreateDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showSendDialog by remember { mutableStateOf(false) }
     var newTemplateName by remember { mutableStateOf("") }
     var pendingTemplateId by remember { mutableStateOf<String?>(null) }
+    val controlsEnabled = state.sendProgress?.running != true
+    val selectedCount = state.selectedDraftRowIds.count { selected ->
+        state.drafts.any { it.rowId == selected }
+    }
 
-    Column(modifier = modifier.fillMaxSize()) {
-        Column(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalArrangement = Arrangement.spacedBy(7.dp),
+    Column(
+        modifier = modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Card(
+            modifier = Modifier.fillMaxWidth().testTag("template-card"),
+            shape = RoundedCornerShape(18.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+            ),
+            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
         ) {
-            Text("短信", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Text("模板", style = MaterialTheme.typography.titleMedium)
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    RoundedActionIcon(
-                        kind = RoundedActionKind.ADD,
-                        onClick = { newTemplateName = ""; showCreateDialog = true },
-                        modifier = Modifier.testTag("template-add"),
-                    )
-                    RoundedActionIcon(
-                        kind = RoundedActionKind.REMOVE,
-                        enabled = templateState.templates.size > 1,
-                        onClick = { showDeleteDialog = true },
-                        modifier = Modifier.testTag("template-delete"),
-                    )
-                }
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Box(modifier = Modifier.weight(1f)) {
-                    OutlinedButton(
-                        onClick = { templateMenuOpen = true },
-                        modifier = Modifier.fillMaxWidth().testTag("template-selector"),
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(7.dp),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text(templateState.editorName.ifBlank { state.selectedTemplateName.ifBlank { "选择模板" } })
+                        Icon(
+                            painter = painterResource(BulkSmsIcons.Template),
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
+                        Text("模板", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                     }
-                    DropdownMenu(
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        RoundedActionIcon(
+                            kind = RoundedActionKind.ADD,
+                            enabled = controlsEnabled,
+                            onClick = { newTemplateName = ""; showCreateDialog = true },
+                            modifier = Modifier.testTag("template-add"),
+                        )
+                        RoundedActionIcon(
+                            kind = RoundedActionKind.REMOVE,
+                            enabled = controlsEnabled && templateState.templates.size > 1,
+                            onClick = { showDeleteDialog = true },
+                            modifier = Modifier.testTag("template-delete"),
+                        )
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    ExposedDropdownMenuBox(
                         expanded = templateMenuOpen,
-                        onDismissRequest = { templateMenuOpen = false },
+                        onExpandedChange = { if (controlsEnabled) templateMenuOpen = it },
+                        modifier = Modifier.weight(1f),
                     ) {
-                        templateState.templates.forEach { template ->
+                        OutlinedTextField(
+                            value = templateState.editorName,
+                            onValueChange = callbacks.onTemplateNameChanged,
+                            enabled = controlsEnabled,
+                            label = { Text("模板名称") },
+                            placeholder = { Text("选择或输入模板名称") },
+                            trailingIcon = {
+                                ExposedDropdownMenuDefaults.TrailingIcon(expanded = templateMenuOpen)
+                            },
+                            colors = neutralOutlinedTextFieldColors(),
+                            modifier = Modifier
+                                .menuAnchor()
+                                .fillMaxWidth()
+                                .testTag("template-selector"),
+                        )
+                        ExposedDropdownMenu(
+                            expanded = templateMenuOpen,
+                            onDismissRequest = { templateMenuOpen = false },
+                        ) {
+                            templateState.templates.forEach { template ->
+                                DropdownMenuItem(
+                                    text = { Text(template.name) },
+                                    onClick = {
+                                        templateMenuOpen = false
+                                        if (templateState.isDirty) {
+                                            pendingTemplateId = template.id
+                                        } else {
+                                            callbacks.onTemplateSelected(template.id)
+                                        }
+                                    },
+                                )
+                            }
+                        }
+                    }
+                    Button(
+                        onClick = callbacks.onSaveTemplate,
+                        enabled = controlsEnabled &&
+                            templateState.isDirty &&
+                            templateState.editorName.isNotBlank() &&
+                            templateState.editorBody.isNotBlank(),
+                        modifier = Modifier.testTag("template-save"),
+                    ) { Text("保存") }
+                }
+
+                val columns = state.table?.columns.orEmpty()
+                val selectedColumnName = state.selectedPhoneColumn
+                    ?.let { index -> columns.getOrNull(index)?.name }
+                    .orEmpty()
+                ExposedDropdownMenuBox(
+                    expanded = phoneColumnMenuOpen,
+                    onExpandedChange = {
+                        if (controlsEnabled && columns.isNotEmpty()) phoneColumnMenuOpen = it
+                    },
+                ) {
+                    OutlinedTextField(
+                        value = selectedColumnName.takeIf { it.isNotBlank() }?.let { "$it 列" }.orEmpty(),
+                        onValueChange = {},
+                        readOnly = true,
+                        enabled = controlsEnabled && columns.isNotEmpty(),
+                        label = { Text("电话号码列") },
+                        placeholder = { Text("选择列") },
+                        trailingIcon = {
+                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = phoneColumnMenuOpen)
+                        },
+                        colors = neutralOutlinedTextFieldColors(),
+                        modifier = Modifier
+                            .menuAnchor()
+                            .fillMaxWidth()
+                            .testTag("template-phone-column"),
+                    )
+                    ExposedDropdownMenu(
+                        expanded = phoneColumnMenuOpen,
+                        onDismissRequest = { phoneColumnMenuOpen = false },
+                    ) {
+                        columns.forEachIndexed { index, column ->
                             DropdownMenuItem(
-                                text = { Text(template.name) },
+                                text = { Text("${column.name} 列") },
                                 onClick = {
-                                    templateMenuOpen = false
-                                    if (templateState.isDirty) {
-                                        pendingTemplateId = template.id
-                                    } else {
-                                        callbacks.onTemplateSelected(template.id)
-                                    }
+                                    phoneColumnMenuOpen = false
+                                    callbacks.onPhoneColumnSelected(index)
                                 },
                             )
                         }
                     }
                 }
-                Button(
-                    onClick = callbacks.onSaveTemplate,
-                    enabled = templateState.isDirty && templateState.editorBody.isNotBlank(),
-                    modifier = Modifier.testTag("template-save"),
-                ) { Text("保存") }
-            }
-            OutlinedTextField(
-                value = templateState.editorBody.ifEmpty { state.selectedTemplateBody.orEmpty() },
-                onValueChange = callbacks.onTemplateBodyChanged,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 92.dp)
-                    .testTag("template-body"),
-                placeholder = { Text("输入模板内容，如：您好，{A}……") },
-                minLines = 2,
-                maxLines = 4,
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                state.table?.columns.orEmpty().forEach { column ->
-                    AssistChip(onClick = {}, label = { Text("{${column.name}}") })
-                }
+
+                OutlinedTextField(
+                    value = templateState.editorBody.ifEmpty { state.selectedTemplateBody.orEmpty() },
+                    onValueChange = callbacks.onTemplateBodyChanged,
+                    enabled = controlsEnabled,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 82.dp)
+                        .testTag("template-body"),
+                    placeholder = { Text("输入模板内容，如：您好，{A}……") },
+                    colors = neutralOutlinedTextFieldColors(),
+                    minLines = 2,
+                    maxLines = 3,
+                )
             }
         }
 
-        HorizontalDivider()
-        Column(
+        Card(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 7.dp),
+                .testTag("preview-card"),
+            shape = RoundedCornerShape(18.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+            ),
+            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
+            Column(
+                modifier = Modifier.fillMaxSize().padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Text("短信预览  ${state.drafts.size} 条", style = MaterialTheme.typography.titleMedium)
-                Row {
-                    TextButton(onClick = callbacks.onSyncAll) { Text("全部同步") }
-                    TextButton(onClick = callbacks.onUnsyncAll) {
-                        Text("全部取消", color = MaterialTheme.colorScheme.error)
-                    }
-                }
+                MessageReviewHeader(
+                    drafts = state.drafts,
+                    selectedRowIds = state.selectedDraftRowIds,
+                    enabled = controlsEnabled,
+                    onSelectAll = callbacks.onSelectAllDrafts,
+                )
+                MessageReviewList(
+                    drafts = state.drafts,
+                    selectedRowIds = state.selectedDraftRowIds,
+                    enabled = controlsEnabled,
+                    onSelectionChanged = callbacks.onDraftSelectionChanged,
+                    modifier = Modifier.weight(1f),
+                )
             }
-            MessageReviewList(
-                drafts = state.drafts,
-                onEdit = callbacks.onDraftChanged,
-                onSyncChanged = callbacks.onDraftSyncChanged,
-                modifier = Modifier.weight(1f),
-            )
         }
 
-        Surface(shadowElevation = 5.dp) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
+        state.blockingError?.let { error ->
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.errorContainer,
             ) {
-                val simLabel = state.simOptions
-                    .firstOrNull { it.subscriptionId == state.selectedSubscriptionId }
-                    ?.displayLabel ?: "未选择 SIM"
-                Column(Modifier.weight(1f)) {
-                    Text(simLabel, style = MaterialTheme.typography.labelMedium)
-                    Text("待发送 ${state.drafts.size} 条", style = MaterialTheme.typography.labelSmall)
+                Text(
+                    error,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+        }
+
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
+            tonalElevation = 3.dp,
+            shadowElevation = 4.dp,
+        ) {
+            val progress = state.sendProgress
+            if (progress != null) {
+                SendProgressFooter(
+                    progress = progress,
+                    onSendAgain = { showSendDialog = true },
+                    canSendAgain = selectedCount > 0 &&
+                        state.selectedPhoneColumn != null &&
+                        state.simOptions.any { it.subscriptionId == state.selectedSubscriptionId },
+                )
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    val simLabel = state.simOptions
+                        .firstOrNull { it.subscriptionId == state.selectedSubscriptionId }
+                        ?.displayLabel ?: when (state.simDetectionState) {
+                            SimDetectionState.PERMISSION_REQUIRED -> "请在设置中授权读取 SIM"
+                            SimDetectionState.LOADING -> "正在检测 SIM"
+                            SimDetectionState.EMPTY -> "没有检测到活动 SIM"
+                            SimDetectionState.ERROR -> "SIM 检测失败"
+                            SimDetectionState.AVAILABLE -> "请选择发送 SIM"
+                        }
+                    Column(Modifier.weight(1f)) {
+                        Text(simLabel, style = MaterialTheme.typography.labelMedium)
+                        Text("待发送 $selectedCount 条", style = MaterialTheme.typography.labelSmall)
+                    }
+                    Button(
+                        onClick = { showSendDialog = true },
+                        enabled = selectedCount > 0 &&
+                            state.selectedPhoneColumn != null &&
+                            state.simOptions.any { it.subscriptionId == state.selectedSubscriptionId },
+                        modifier = Modifier.testTag("send-selected"),
+                    ) {
+                        Icon(
+                            painter = painterResource(BulkSmsIcons.Send),
+                            contentDescription = null,
+                        )
+                        Text("确认并发送")
+                    }
                 }
-                Button(
-                    onClick = { showSendDialog = true },
-                    enabled = state.drafts.isNotEmpty() && state.selectedPhoneColumn != null,
-                ) { Text("确认并发送") }
             }
         }
     }
@@ -194,6 +331,7 @@ fun SmsScreen(
                     onValueChange = { newTemplateName = it },
                     label = { Text("模板名称") },
                     singleLine = true,
+                    colors = neutralOutlinedTextFieldColors(),
                 )
             },
             dismissButton = { TextButton(onClick = { showCreateDialog = false }) { Text("取消") } },
@@ -237,12 +375,62 @@ fun SmsScreen(
     if (showSendDialog) {
         AlertDialog(
             onDismissRequest = { showSendDialog = false },
-            title = { Text("确认发送 ${state.drafts.size} 条短信？") },
+            title = { Text("确认发送 $selectedCount 条短信？") },
             text = { Text("短信提交后无法撤回，可能产生运营商费用。") },
             dismissButton = { TextButton(onClick = { showSendDialog = false }) { Text("取消") } },
             confirmButton = {
-                Button(onClick = { showSendDialog = false; callbacks.onConfirmSend() }) { Text("确认发送") }
+                Button(onClick = { showSendDialog = false; callbacks.onRequestSend() }) {
+                    Text("确认发送")
+                }
             },
         )
+    }
+}
+
+@Composable
+private fun SendProgressFooter(
+    progress: SendProgressUiState,
+    onSendAgain: () -> Unit,
+    canSendAgain: Boolean,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        if (progress.running) {
+            Text(
+                "正在发送 ${progress.processed}/${progress.total}",
+                style = MaterialTheme.typography.labelMedium,
+            )
+            LinearProgressIndicator(
+                progress = {
+                    if (progress.total == 0) 0f else progress.processed.toFloat() / progress.total
+                },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        } else {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(7.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    painter = painterResource(
+                        if (progress.failed == 0) BulkSmsIcons.Success else BulkSmsIcons.Error,
+                    ),
+                    contentDescription = null,
+                    tint = if (progress.failed == 0) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.error
+                    },
+                )
+                Text("发送完成", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+            }
+            Text(
+                "成功 ${progress.succeeded} 条，失败 ${progress.failed} 条",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            TextButton(onClick = onSendAgain, enabled = canSendAgain) { Text("再次发送") }
+        }
     }
 }

@@ -1,14 +1,21 @@
 package com.local.bulksms.ui
 
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -33,16 +40,18 @@ data class BulkSmsCallbacks(
     val onHeaderModeChanged: (Boolean) -> Unit = {},
     val onPhoneColumnSelected: (Int) -> Unit = {},
     val onSubscriptionSelected: (Int) -> Unit = {},
+    val onRequestSimPermission: () -> Unit = {},
+    val onRefreshSimOptions: () -> Unit = {},
+    val onSendIntervalChanged: (Long) -> Unit = {},
     val onTemplateSelected: (String) -> Unit = {},
+    val onTemplateNameChanged: (String) -> Unit = {},
     val onTemplateBodyChanged: (String) -> Unit = {},
     val onCreateTemplate: (String) -> Unit = {},
     val onSaveTemplate: () -> Unit = {},
     val onDeleteTemplate: () -> Unit = {},
-    val onDraftChanged: (Long, String) -> Unit = { _, _ -> },
-    val onDraftSyncChanged: (Long, Boolean) -> Unit = { _, _ -> },
-    val onSyncAll: () -> Unit = {},
-    val onUnsyncAll: () -> Unit = {},
-    val onConfirmSend: () -> Unit = {},
+    val onDraftSelectionChanged: (Long, Boolean) -> Unit = { _, _ -> },
+    val onSelectAllDrafts: (Boolean) -> Unit = {},
+    val onRequestSend: () -> Unit = {},
 )
 
 @Composable
@@ -50,28 +59,58 @@ fun BulkSmsApp(
     sendState: SendFlowUiState,
     templateState: TemplateUiState,
     callbacks: BulkSmsCallbacks,
+    externalDataNavigationRequest: Long = 0L,
 ) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route ?: AppDestination.DATA.route
 
+    LaunchedEffect(externalDataNavigationRequest) {
+        if (externalDataNavigationRequest > 0L && currentRoute != AppDestination.DATA.route) {
+            navController.navigate(AppDestination.DATA.route) {
+                popUpTo(AppDestination.DATA.route)
+                launchSingleTop = true
+            }
+        }
+    }
+
     Scaffold(
         bottomBar = {
-            NavigationBar {
-                AppDestination.entries.forEach { destination ->
-                    NavigationBarItem(
-                        modifier = Modifier.testTag("nav-${destination.route}"),
-                        selected = currentRoute == destination.route,
-                        onClick = {
-                            navController.navigate(destination.route) {
-                                popUpTo(AppDestination.DATA.route) { saveState = true }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
-                        },
-                        icon = { Text(destination.label.take(1)) },
-                        label = { Text(destination.label) },
-                    )
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceContainer,
+                shadowElevation = 8.dp,
+            ) {
+                NavigationBar(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                    tonalElevation = 0.dp,
+                ) {
+                    AppDestination.entries.forEach { destination ->
+                        NavigationBarItem(
+                            modifier = Modifier.testTag("nav-${destination.route}"),
+                            selected = currentRoute == destination.route,
+                            onClick = {
+                                navController.navigate(destination.route) {
+                                    popUpTo(AppDestination.DATA.route) { saveState = true }
+                                    launchSingleTop = true
+                                    restoreState = true
+                                }
+                            },
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = MaterialTheme.colorScheme.primary,
+                                selectedTextColor = MaterialTheme.colorScheme.onSurface,
+                                indicatorColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                                unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            ),
+                            icon = {
+                                Icon(
+                                    painter = painterResource(destination.iconRes),
+                                    contentDescription = "${destination.label}图标",
+                                )
+                            },
+                            label = { Text(destination.label) },
+                        )
+                    }
                 }
             }
         },

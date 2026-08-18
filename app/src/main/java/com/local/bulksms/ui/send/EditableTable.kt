@@ -4,6 +4,8 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.rememberScrollable2DState
+import androidx.compose.foundation.gestures.scrollable2D
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,6 +25,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -49,6 +53,11 @@ fun EditableTable(
 ) {
     val horizontalScroll = rememberScrollState()
     val verticalScroll = rememberScrollState()
+    val twoDimensionalScroll = rememberScrollable2DState { delta ->
+        val consumedX = horizontalScroll.dispatchRawDelta(-delta.x)
+        val consumedY = verticalScroll.dispatchRawDelta(-delta.y)
+        Offset(-consumedX, -consumedY)
+    }
     val borderColor = MaterialTheme.colorScheme.outlineVariant
     val headerColor = MaterialTheme.colorScheme.surfaceVariant
     val columnWidths = table.columns.mapIndexed { index, column ->
@@ -60,13 +69,14 @@ fun EditableTable(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .horizontalScroll(horizontalScroll)
-            .testTag("editable-table-horizontal"),
+            .clipToBounds()
+            .scrollable2D(twoDimensionalScroll)
+            .testTag("editable-table-2d"),
     ) {
         Column(
             modifier = Modifier
-                .verticalScroll(verticalScroll)
-                .testTag("editable-table-vertical"),
+                .horizontalScroll(horizontalScroll, enabled = false)
+                .verticalScroll(verticalScroll, enabled = false),
         ) {
             Row {
                 AxisCell("", 36.dp, headerColor)
@@ -74,11 +84,7 @@ fun EditableTable(
                     AxisCell(
                         text = column.name,
                         width = columnWidths[index],
-                        background = if (index == table.phoneColumnIndex) {
-                            MaterialTheme.colorScheme.primaryContainer
-                        } else {
-                            headerColor
-                        },
+                        background = headerColor,
                         modifier = Modifier
                             .combinedClickable(
                                 onClick = { },

@@ -4,16 +4,18 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.hasScrollAction
-import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextReplacement
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipe
 import com.local.bulksms.model.DynamicColumn
 import com.local.bulksms.model.DynamicRow
 import com.local.bulksms.model.ImportedTable
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -22,7 +24,7 @@ class EditableTableTest {
     val composeRule = createComposeRule()
 
     @Test
-    fun tableExposesHorizontalAndVerticalScrolling() {
+    fun diagonalSwipeMovesTableHorizontallyAndVerticallyTogether() {
         val table = ImportedTable(
             columns = (0 until 8).map { DynamicColumn(it, "列${it + 1}") },
             rows = (0L until 30L).map { rowId ->
@@ -37,8 +39,19 @@ class EditableTableTest {
             }
         }
 
-        composeRule.onNodeWithTag("editable-table-horizontal").assert(hasScrollAction())
-        composeRule.onNodeWithTag("editable-table-vertical").assert(hasScrollAction())
+        val cell = composeRule.onNodeWithTag("cell-0-0")
+        val before = cell.fetchSemanticsNode().boundsInRoot
+        composeRule.onNodeWithTag("editable-table-2d").performTouchInput {
+            swipe(
+                start = Offset(width * 0.8f, height * 0.8f),
+                end = Offset(width * 0.2f, height * 0.2f),
+                durationMillis = 500,
+            )
+        }
+        val after = cell.fetchSemanticsNode().boundsInRoot
+
+        assertTrue(after.left < before.left)
+        assertTrue(after.top < before.top)
     }
 
     @Test
