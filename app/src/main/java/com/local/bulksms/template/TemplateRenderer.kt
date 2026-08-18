@@ -44,7 +44,7 @@ class TemplateRenderer(
     fun render(template: String, values: Map<String, String>): String {
         val normalized = values.mapKeys { (key, _) -> key.variableKey() }
         return token.replace(template) { match ->
-            normalized[match.groupValues[1].variableKey()].orEmpty()
+            normalized[match.groupValues[1].variableKey()] ?: match.value
         }
     }
 
@@ -61,8 +61,8 @@ class TemplateRenderer(
         backupPhoneColumnIndex: Int? = null,
     ): MessageDraft {
         val columnNames = columns.map(DynamicColumn::name)
-        // Unknown placeholders render as empty text instead of throwing, so a
-        // mismatched template still produces a draft (the missing field is just blank).
+        // Unknown placeholders stay verbatim (e.g. "{名字}") instead of throwing, so
+        // the preview shows exactly which field failed to match.
         val values = columns.mapIndexed { index, column ->
             column.name to row.cells.getOrElse(index) { "" }
         }.toMap()

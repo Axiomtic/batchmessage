@@ -195,9 +195,9 @@ class TemplateRendererTest {
     }
 
     @Test
-    fun renderDraftRendersMissingVariableAsEmpty() {
+    fun renderDraftKeepsMissingVariablePlaceholder() {
         val draft = renderer.renderDraft(row, "{姓名} {日期}")
-        assertEquals("张三 ", draft.currentBody)
+        assertEquals("张三 {日期}", draft.currentBody)
     }
 
     @Test
