@@ -23,6 +23,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -38,6 +39,8 @@ import com.local.bulksms.ui.BulkSmsCallbacks
 import com.local.bulksms.ui.icons.BulkSmsIcons
 import com.local.bulksms.ui.send.EditableTable
 import com.local.bulksms.ui.send.SendFlowUiState
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 private val EXCEL_MIME_TYPES = arrayOf(
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -57,8 +60,14 @@ fun DataScreen(
 ) {
     val context = LocalContext.current
     var deleteTarget by remember { mutableStateOf<DeleteTarget?>(null) }
+    val scope = rememberCoroutineScope()
     val fileLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        uri?.let { context.contentResolver.openInputStream(it)?.use(callbacks.onExcelImport) }
+        // Parsing a large workbook blocks the UI thread; do it off the main thread.
+        uri?.let { resolved ->
+            scope.launch(Dispatchers.IO) {
+                context.contentResolver.openInputStream(resolved)?.use(callbacks.onExcelImport)
+            }
+        }
     }
 
     Column(

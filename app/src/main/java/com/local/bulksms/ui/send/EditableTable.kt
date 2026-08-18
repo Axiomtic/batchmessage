@@ -1,24 +1,23 @@
 package com.local.bulksms.ui.send
 
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.gestures.rememberScrollable2DState
-import androidx.compose.foundation.gestures.scrollable2D
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -26,7 +25,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -43,7 +41,6 @@ data class CellEdit(val rowId: Long, val columnIndex: Int, val value: String)
 
 data class HeaderEdit(val columnIndex: Int, val value: String)
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun EditableTable(
     table: ImportedTable,
@@ -57,12 +54,6 @@ fun EditableTable(
     modifier: Modifier = Modifier,
 ) {
     val horizontalScroll = rememberScrollState()
-    val verticalScroll = rememberScrollState()
-    val twoDimensionalScroll = rememberScrollable2DState { delta ->
-        val consumedX = horizontalScroll.dispatchRawDelta(-delta.x)
-        val consumedY = verticalScroll.dispatchRawDelta(-delta.y)
-        Offset(-consumedX, -consumedY)
-    }
     val borderColor = MaterialTheme.colorScheme.outlineVariant
     val headerColor = MaterialTheme.colorScheme.surfaceVariant
     val columnWidths = table.columns.mapIndexed { index, column ->
@@ -70,19 +61,22 @@ fun EditableTable(
             listOf(column.name) + table.rows.map { it.cells.getOrNull(index).orEmpty() },
         )
     }
+    val columnsWidth = columnWidths.fold(0.dp) { total, width -> total + width }
+    val contentWidth = 36.dp + columnsWidth + 40.dp
 
     Box(
         modifier = modifier
             .fillMaxSize()
             .clipToBounds()
-            .scrollable2D(twoDimensionalScroll)
             .testTag("editable-table-2d"),
     ) {
         Column(
             modifier = Modifier
-                .horizontalScroll(horizontalScroll, enabled = false)
-                .verticalScroll(verticalScroll, enabled = false),
+                .width(contentWidth)
+                .fillMaxHeight()
+                .horizontalScroll(horizontalScroll),
         ) {
+            // Header row, pinned above the lazily rendered data rows.
             Row {
                 AxisCell("", 36.dp, headerColor)
                 table.columns.forEachIndexed { index, column ->
@@ -111,44 +105,47 @@ fun EditableTable(
                 )
             }
 
-            table.rows.forEachIndexed { rowIndex, row ->
-                Row {
-                    AxisCell(
-                        text = (rowIndex + 1).toString(),
-                        width = 36.dp,
-                        background = headerColor,
-                        modifier = Modifier
-                            .combinedClickable(
-                                onClick = { },
-                                onLongClick = { onDeleteRowRequested(row.id) },
-                            )
-                            .testTag("row-label-$rowIndex"),
-                    )
-                    table.columns.indices.forEach { columnIndex ->
-                        val value = row.cells.getOrNull(columnIndex).orEmpty()
-                        val isPhoneColumn = columnIndex == table.phoneColumnIndex ||
-                            columnIndex == table.backupPhoneColumnIndex
-                        val textColor = if (isPhoneColumn) {
-                            phoneCellColor(PhoneNumberChecker.availability(value))
-                        } else {
-                            MaterialTheme.colorScheme.onSurface
-                        }
-                        BasicTextField(
-                            value = value,
-                            onValueChange = { newValue ->
-                                onCellChanged(CellEdit(row.id, columnIndex, newValue))
-                            },
+            // Data rows, vertically lazy so a 1000-row sheet only composes the visible rows.
+            LazyColumn(modifier = Modifier.weight(1f)) {
+                itemsIndexed(table.rows, key = { _, row -> row.id }) { rowIndex, row ->
+                    Row {
+                        AxisCell(
+                            text = (rowIndex + 1).toString(),
+                            width = 36.dp,
+                            background = headerColor,
                             modifier = Modifier
-                                .width(columnWidths[columnIndex])
-                                .height(38.dp)
-                                .border(0.5.dp, borderColor)
-                                .padding(horizontal = 8.dp, vertical = 9.dp)
-                                .testTag("cell-${row.id}-$columnIndex"),
-                            singleLine = true,
-                            textStyle = MaterialTheme.typography.bodySmall.copy(color = textColor),
+                                .combinedClickable(
+                                    onClick = { },
+                                    onLongClick = { onDeleteRowRequested(row.id) },
+                                )
+                                .testTag("row-label-$rowIndex"),
                         )
+                        table.columns.indices.forEach { columnIndex ->
+                            val value = row.cells.getOrNull(columnIndex).orEmpty()
+                            val isPhoneColumn = columnIndex == table.phoneColumnIndex ||
+                                columnIndex == table.backupPhoneColumnIndex
+                            val textColor = if (isPhoneColumn) {
+                                phoneCellColor(PhoneNumberChecker.availability(value))
+                            } else {
+                                MaterialTheme.colorScheme.onSurface
+                            }
+                            BasicTextField(
+                                value = value,
+                                onValueChange = { newValue ->
+                                    onCellChanged(CellEdit(row.id, columnIndex, newValue))
+                                },
+                                modifier = Modifier
+                                    .width(columnWidths[columnIndex])
+                                    .height(38.dp)
+                                    .border(0.5.dp, borderColor)
+                                    .padding(horizontal = 8.dp, vertical = 9.dp)
+                                    .testTag("cell-${row.id}-$columnIndex"),
+                                singleLine = true,
+                                textStyle = MaterialTheme.typography.bodySmall.copy(color = textColor),
+                            )
+                        }
+                        Box(Modifier.size(40.dp))
                     }
-                    Box(Modifier.size(40.dp))
                 }
             }
 
@@ -160,7 +157,7 @@ fun EditableTable(
                 )
                 Box(
                     Modifier
-                        .width(columnWidths.fold(0.dp) { total, width -> total + width })
+                        .width(columnsWidth)
                         .height(40.dp)
                         .border(0.5.dp, borderColor),
                 )
