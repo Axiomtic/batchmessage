@@ -195,10 +195,9 @@ class TemplateRendererTest {
     }
 
     @Test
-    fun renderDraftRejectsMissingVariable() {
-        assertThrows(IllegalArgumentException::class.java) {
-            renderer.renderDraft(row, "{姓名} {日期}")
-        }
+    fun renderDraftRendersMissingVariableAsEmpty() {
+        val draft = renderer.renderDraft(row, "{姓名} {日期}")
+        assertEquals("张三 ", draft.currentBody)
     }
 
     @Test

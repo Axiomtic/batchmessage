@@ -617,6 +617,7 @@ class SendFlowViewModel(
                 val current = mutableState.value
                 val phoneColumn = PhoneColumnDetector.recommend(materialized)
                 val table = materialized.copy(phoneColumnIndex = phoneColumn)
+                val missing = templateMissing(table)
                 updateState {
                     current.copy(
                         rawTable = raw,
@@ -625,7 +626,8 @@ class SendFlowViewModel(
                         selectedPhoneColumn = phoneColumn,
                         selectedBackupPhoneColumn = null,
                         importWarnings = raw.warnings,
-                        blockingError = null,
+                        blockingError = missing.toTemplateError(),
+                        missingTemplateVariables = missing,
                         importId = idFactory(),
                         pendingImport = null,
                     ).replaceDrafts(refreshDrafts(current, table))
@@ -641,12 +643,14 @@ class SendFlowViewModel(
                 val current = mutableState.value
                 val phoneColumn = PhoneColumnDetector.recommend(materialized)
                 val table = materialized.copy(phoneColumnIndex = phoneColumn)
+                val missing = templateMissing(table)
                 updateState {
                     current.copy(
                         table = table,
                         selectedPhoneColumn = phoneColumn,
                         selectedBackupPhoneColumn = null,
-                        blockingError = null,
+                        blockingError = missing.toTemplateError(),
+                        missingTemplateVariables = missing,
                     ).replaceDrafts(refreshDrafts(current, table))
                 }
             },
@@ -670,13 +674,15 @@ class SendFlowViewModel(
                     phoneColumnIndex = selectedPhone,
                     backupPhoneColumnIndex = selectedBackup,
                 )
+                val missing = templateMissing(table)
                 updateState {
                     current.copy(
                         rawTable = updatedRaw,
                         table = table,
                         selectedPhoneColumn = selectedPhone,
                         selectedBackupPhoneColumn = selectedBackup,
-                        blockingError = null,
+                        blockingError = missing.toTemplateError(),
+                        missingTemplateVariables = missing,
                     ).replaceDrafts(refreshDrafts(current, table))
                 }
             },
@@ -687,7 +693,6 @@ class SendFlowViewModel(
     private fun refreshDrafts(current: SendFlowUiState, table: ImportedTable): List<MessageDraft> {
         val template = current.selectedTemplateBody ?: return current.drafts
         val renderer = TemplateRenderer(table)
-        if (renderer.validate(template).isNotEmpty()) return current.drafts
         val rowsWithData = table.rows.filter { row -> row.cells.any { it.isNotBlank() } }
         val rowIds = rowsWithData.mapTo(mutableSetOf()) { it.id }
         val existing = current.drafts.associateBy { it.rowId }
@@ -697,6 +702,11 @@ class SendFlowViewModel(
         }
         val detached = current.drafts.filter { !it.syncWithTable && it.rowId !in rowIds }
         return refreshed + detached
+    }
+
+    private fun templateMissing(table: ImportedTable): Set<String> {
+        val template = mutableState.value.selectedTemplateBody ?: return emptySet()
+        return TemplateRenderer(table).validate(template)
     }
 
     private fun SendFlowUiState.replaceDrafts(newDrafts: List<MessageDraft>): SendFlowUiState {

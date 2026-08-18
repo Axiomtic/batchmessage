@@ -44,7 +44,7 @@ class TemplateRenderer(
     fun render(template: String, values: Map<String, String>): String {
         val normalized = values.mapKeys { (key, _) -> key.variableKey() }
         return token.replace(template) { match ->
-            normalized.getValue(match.groupValues[1].variableKey())
+            normalized[match.groupValues[1].variableKey()].orEmpty()
         }
     }
 
@@ -61,9 +61,8 @@ class TemplateRenderer(
         backupPhoneColumnIndex: Int? = null,
     ): MessageDraft {
         val columnNames = columns.map(DynamicColumn::name)
-        val missing = validate(template, columnNames)
-        require(missing.isEmpty()) { "模板包含不存在的变量: ${missing.joinToString("、")}" }
-
+        // Unknown placeholders render as empty text instead of throwing, so a
+        // mismatched template still produces a draft (the missing field is just blank).
         val values = columns.mapIndexed { index, column ->
             column.name to row.cells.getOrElse(index) { "" }
         }.toMap()
