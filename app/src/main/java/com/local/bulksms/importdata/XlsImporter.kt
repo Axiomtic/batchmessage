@@ -343,8 +343,6 @@ internal class Biff8Parser(
         val cells = mutableMapOf<Int, MutableMap<Int, String>>()
         val warnings = mutableListOf<String>()
         var pendingFormula: Pair<Int, Int>? = null
-        var lastRow = -1
-        var lastColumn = -1
 
         while (position + 4 <= stream.size) {
             val type = u16(position)
@@ -362,8 +360,6 @@ internal class Biff8Parser(
                             ""
                         }
                     cells.getOrPut(row) { mutableMapOf() }[column] = value
-                    lastRow = maxOf(lastRow, row)
-                    lastColumn = maxOf(lastColumn, column)
                 }
                 RECORD_NUMBER -> {
                     val row = u16(data)
@@ -371,8 +367,6 @@ internal class Biff8Parser(
                     val xf = u16(data + 4)
                     val value = doubleAt(data + 6)
                     cells.getOrPut(row) { mutableMapOf() }[column] = formatNumber(value, xf)
-                    lastRow = maxOf(lastRow, row)
-                    lastColumn = maxOf(lastColumn, column)
                 }
                 RECORD_RK -> {
                     val row = u16(data)
@@ -380,8 +374,6 @@ internal class Biff8Parser(
                     val xf = u16(data + 4)
                     val value = decodeRk(i32(data + 6))
                     cells.getOrPut(row) { mutableMapOf() }[column] = formatNumber(value, xf)
-                    lastRow = maxOf(lastRow, row)
-                    lastColumn = maxOf(lastColumn, column)
                 }
                 RECORD_MUL_RK -> {
                     val row = u16(data)
@@ -396,8 +388,6 @@ internal class Biff8Parser(
                         cursor += 6
                         column++
                     }
-                    lastRow = maxOf(lastRow, row)
-                    lastColumn = maxOf(lastColumn, columnLast)
                 }
                 RECORD_BOOL_ERR -> {
                     val row = u16(data)
@@ -406,8 +396,6 @@ internal class Biff8Parser(
                     val value = stream[data + 5].toInt() and 0xFF
                     val text = if (isError != 0) biffErrorText(value) else if (value != 0) "TRUE" else "FALSE"
                     cells.getOrPut(row) { mutableMapOf() }[column] = text
-                    lastRow = maxOf(lastRow, row)
-                    lastColumn = maxOf(lastColumn, column)
                 }
                 RECORD_FORMULA -> {
                     val row = u16(data)
@@ -426,8 +414,6 @@ internal class Biff8Parser(
                             cells.getOrPut(row) { mutableMapOf() }[column] = ""
                         FormulaValueType.STRING -> pendingFormula = row to column
                     }
-                    lastRow = maxOf(lastRow, row)
-                    lastColumn = maxOf(lastColumn, column)
                 }
                 RECORD_STRING -> {
                     pendingFormula?.let { (row, column) ->
