@@ -14,9 +14,7 @@ import org.apache.poi.ss.usermodel.WorkbookFactory
  * Cell values are rendered through [DataFormatter] so numbers, dates, booleans and
  * formula results all come out as display text.
  */
-class PoiExcelImporter(
-    private val maxRows: Int = HeaderDetector.MAX_DATA_ROWS + 1,
-) : TableImporter {
+class PoiExcelImporter : TableImporter {
     override fun import(input: InputStream): RawTable {
         val workbook = try {
             WorkbookFactory.create(input)
@@ -33,9 +31,6 @@ class PoiExcelImporter(
             val sheet = wb.getSheetAt(0)
             val formatter = DataFormatter(Locale.US)
             val lastRow = sheet.lastRowNum
-            if (lastRow + 1 > maxRows) {
-                throw ImportLimitExceeded(lastRow + 1)
-            }
 
             val rawRows = mutableListOf<List<String>>()
             var width = 0

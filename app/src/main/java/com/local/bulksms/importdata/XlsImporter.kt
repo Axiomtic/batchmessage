@@ -12,8 +12,7 @@ import java.nio.charset.StandardCharsets
  *
  * The importer handles the OLE2 compound document container and the BIFF8 record
  * stream: shared strings, number / RK / boolean / error / formula cells and
- * date-formatted numbers. At most [HeaderDetector.MAX_DATA_ROWS] + 1 raw rows are
- * returned, mirroring [XlsxImporter].
+ * date-formatted numbers.
  */
 class XlsImporter : TableImporter {
     override fun import(input: InputStream): RawTable {
@@ -21,7 +20,7 @@ class XlsImporter : TableImporter {
         val compound = Ole2CompoundDocument.parse(bytes)
         val workbook = compound.stream("Workbook") ?: compound.stream("Book")
             ?: throw IllegalArgumentException("XLS 文件中未找到工作簿流")
-        return Biff8Parser(workbook, HeaderDetector.MAX_DATA_ROWS + 1).parse()
+        return Biff8Parser(workbook).parse()
     }
 }
 
@@ -290,7 +289,6 @@ internal class Ole2CompoundDocument private constructor(
  */
 internal class Biff8Parser(
     private val stream: ByteArray,
-    private val maxRows: Int,
 ) {
     private var position = 0
     private val sharedStrings = mutableListOf<String>()
@@ -437,9 +435,6 @@ internal class Biff8Parser(
                         pendingFormula = null
                     }
                 }
-            }
-            if (lastRow >= maxRows) {
-                throw ImportLimitExceeded(lastRow + 1)
             }
             position += 4 + length
         }

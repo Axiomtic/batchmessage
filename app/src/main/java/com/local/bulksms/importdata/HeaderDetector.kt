@@ -6,13 +6,7 @@ import com.local.bulksms.model.ImportedTable
 import com.local.bulksms.model.RawTable
 import com.local.bulksms.model.columnAddress
 
-class ImportLimitExceeded(
-    val actualRows: Int,
-    val maxRows: Int = HeaderDetector.MAX_DATA_ROWS,
-) : IllegalArgumentException("数据行数 $actualRows 超过上限 $maxRows")
-
 object HeaderDetector {
-    const val MAX_DATA_ROWS = 100
 
     fun detect(raw: RawTable): Boolean {
         if (raw.rows.size < 2) return false
@@ -32,9 +26,6 @@ object HeaderDetector {
     fun materialize(raw: RawTable, firstRowIsHeader: Boolean): ImportedTable {
         val width = raw.rows.maxOfOrNull { it.size } ?: 0
         val dataRows = if (firstRowIsHeader) raw.rows.drop(1) else raw.rows
-        if (dataRows.size > MAX_DATA_ROWS) {
-            throw ImportLimitExceeded(dataRows.size)
-        }
 
         val names = if (firstRowIsHeader) {
             headerNames(raw.rows.firstOrNull().orEmpty(), width)

@@ -525,10 +525,6 @@ class SendFlowViewModel(
         val current = mutableState.value
         val raw = current.rawTable ?: return
         val table = current.table ?: return
-        if (table.rows.size >= HeaderDetector.MAX_DATA_ROWS) {
-            updateState { current.copy(blockingError = "数据行数不能超过 ${HeaderDetector.MAX_DATA_ROWS}") }
-            return
-        }
         rematerializeCurrent(raw.copy(rows = raw.rows + listOf(List(table.columns.size) { "" })))
     }
 

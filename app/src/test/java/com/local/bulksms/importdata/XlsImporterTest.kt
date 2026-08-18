@@ -142,8 +142,8 @@ class XlsImporterTest {
     }
 
     @Test
-    fun enforcesRowLimitLikeXlsx() {
-        val cells = (0..HeaderDetector.MAX_DATA_ROWS + 1).map { row ->
+    fun importsMoreThanOneHundredRows() {
+        val cells = (0..150).map { row ->
             XlsFixture.labelSst(row, 0, 0)
         }
         val workbook = XlsFixture.workbook(
@@ -156,8 +156,7 @@ class XlsImporterTest {
             sheet = listOf(XlsFixture.bof(0x0010)) + cells + listOf(XlsFixture.eof()),
         )
 
-        assertThrows(ImportLimitExceeded::class.java) {
-            XlsImporter().import(XlsFixture.ole2(workbook).inputStream())
-        }
+        val raw = XlsImporter().import(XlsFixture.ole2(workbook).inputStream())
+        assertEquals(151, raw.rows.size)
     }
 }

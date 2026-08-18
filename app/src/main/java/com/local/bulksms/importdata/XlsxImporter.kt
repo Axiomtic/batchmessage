@@ -17,10 +17,6 @@ import org.xml.sax.InputSource
 
 /**
  * Reads the first visible worksheet from an OOXML workbook without a runtime library dependency.
- *
- * The importer deliberately returns at most 101 raw rows. The extra row is needed because the
- * first row may be a header; [HeaderDetector] makes the final 100-data-row decision once the user
- * has selected the header mode.
  */
 class XlsxImporter : TableImporter {
     override fun import(input: InputStream): RawTable {
@@ -179,10 +175,6 @@ class XlsxImporter : TableImporter {
         val rows = mutableListOf<List<String>>()
         val warnings = mutableListOf<String>()
         for (rowElement in rowElements) {
-            val nextRowNumber = rows.size + 1
-            if (nextRowNumber > MAX_RAW_ROWS) {
-                throw ImportLimitExceeded(nextRowNumber)
-            }
             val cells = mutableMapOf<Int, String>()
             var implicitColumn = 0
             for (cell in childElements(rowElement, "c")) {
@@ -424,7 +416,6 @@ class XlsxImporter : TableImporter {
         const val STYLES_PATH = "xl/styles.xml"
         const val MAX_UNCOMPRESSED_BYTES = 8L * 1024L * 1024L
         const val MAX_COLUMN_COUNT = 16_384
-        const val MAX_RAW_ROWS = HeaderDetector.MAX_DATA_ROWS + 1
         const val BUFFER_SIZE = 8 * 1024
         const val WORKSHEET_RELATIONSHIP_TYPE =
             "http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet"

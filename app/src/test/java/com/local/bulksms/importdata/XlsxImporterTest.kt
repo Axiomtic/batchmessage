@@ -165,30 +165,14 @@ class XlsxImporterTest {
     }
 
     @Test
-    fun acceptsOneHundredAndOneRawRowsForHeaderDetection() {
-        val rows = (1..101).map { listOf(number("$it")) }
+    fun importsMoreThanOneHundredRows() {
+        val rows = (1..150).map { listOf(number("$it")) }
         val raw = XlsxImporter().import(
             xlsxFixture(sheets = listOf(visibleSheet("Data", rows))).inputStream(),
         )
 
-        assertEquals(101, raw.rows.size)
-        assertThrows(ImportLimitExceeded::class.java) {
-            HeaderDetector.materialize(raw, firstRowIsHeader = false)
-        }
-        assertEquals(100, HeaderDetector.materialize(raw, firstRowIsHeader = true).rows.size)
-    }
-
-    @Test
-    fun rejectsUnsupportedOrOversizedWorkbook() {
-        assertThrows(ImportLimitExceeded::class.java) {
-            XlsxImporter().import(
-                xlsxFixture(
-                    sheets = listOf(
-                        visibleSheet("Data", (1..102).map { listOf(number("$it")) }),
-                    ),
-                ).inputStream(),
-            )
-        }
+        assertEquals(150, raw.rows.size)
+        assertEquals(150, HeaderDetector.materialize(raw, firstRowIsHeader = false).rows.size)
     }
 
     @Test

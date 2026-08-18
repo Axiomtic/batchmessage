@@ -176,12 +176,11 @@ class TabularImportTest {
     }
 
     @Test
-    fun moreThanOneHundredDataRowsIsRejected() {
-        val text = (1..101).joinToString("\n") { "1380013%04d\t姓名$it".format(it) }
+    fun moreThanOneHundredDataRowsAreImported() {
+        val text = (1..150).joinToString("\n") { "1380013%04d\t姓名$it".format(it) }
         val raw = TabularTextParser.parse(text)
 
-        assertThrows(ImportLimitExceeded::class.java) {
-            HeaderDetector.materialize(raw, firstRowIsHeader = false)
-        }
+        val table = HeaderDetector.materialize(raw, firstRowIsHeader = false)
+        assertEquals(150, table.rows.size)
     }
 }
