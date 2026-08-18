@@ -52,6 +52,7 @@ class SendFlowViewModelTest {
         viewModel.toggleDraftSelection(existingIds.last(), false)
 
         viewModel.editCell(rowId = 2L, columnIndex = 0, value = "王五")
+        viewModel.refreshPreview()
 
         assertEquals(
             setOf(existingIds.first(), 2L),
@@ -216,6 +217,7 @@ class SendFlowViewModelTest {
         viewModel.selectPhoneColumn(0)
 
         viewModel.selectBackupPhoneColumn(1)
+        viewModel.refreshPreview()
 
         val state = viewModel.state.value
         assertEquals(0, state.selectedPhoneColumn)

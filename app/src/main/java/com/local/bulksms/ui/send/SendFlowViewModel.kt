@@ -64,6 +64,8 @@ data class SendFlowUiState(
     val sendProgress: SendProgressUiState? = null,
     val sendIntervalMillis: Long = DEFAULT_SEND_INTERVAL_MILLIS,
     val workspaceReady: Boolean = true,
+    /** True when the preview needs a manual refresh to match the current data/template. */
+    val draftsStale: Boolean = false,
 )
 
 class SendFlowViewModel(
@@ -153,7 +155,8 @@ class SendFlowViewModel(
                 selectedPhoneColumn = columnIndex,
                 selectedBackupPhoneColumn = backup,
                 table = updatedTable,
-            ).replaceDrafts(refreshDrafts(current, updatedTable))
+                draftsStale = true,
+            )
         }
     }
 
@@ -168,7 +171,8 @@ class SendFlowViewModel(
             current.copy(
                 selectedBackupPhoneColumn = columnIndex,
                 table = updatedTable,
-            ).replaceDrafts(refreshDrafts(current, updatedTable))
+                draftsStale = true,
+            )
         }
     }
 
@@ -207,7 +211,8 @@ class SendFlowViewModel(
                 selectedPhoneColumn = null,
                 table = updatedTable,
                 blockingError = null,
-            ).replaceDrafts(refreshDrafts(current, updatedTable))
+                draftsStale = true,
+            )
         }
     }
 
@@ -220,7 +225,8 @@ class SendFlowViewModel(
                 selectedBackupPhoneColumn = null,
                 table = updatedTable,
                 blockingError = null,
-            ).replaceDrafts(refreshDrafts(current, updatedTable))
+                draftsStale = true,
+            )
         }
     }
 
@@ -374,9 +380,8 @@ class SendFlowViewModel(
                 missingTemplateVariables = missing,
                 blockingError = missing.takeIf { it.isNotEmpty() }
                     ?.let { "模板包含不存在的变量：${it.joinToString("、")}" },
-            ).replaceDrafts(
-                if (missing.isEmpty()) refreshDrafts(withTemplate, table) else current.drafts,
-            )
+                draftsStale = false,
+            ).replaceDrafts(refreshDrafts(withTemplate, table))
         }
     }
 
@@ -431,14 +436,27 @@ class SendFlowViewModel(
         val current = mutableState.value
         val table = current.table ?: return
         val missing = TemplateRenderer(table).validate(body)
-        val withBody = current.copy(selectedTemplateBody = body)
         updateState {
-            withBody.copy(
+            current.copy(
+                selectedTemplateBody = body,
                 missingTemplateVariables = missing,
                 blockingError = missing.toTemplateError(),
-            ).replaceDrafts(
-                if (missing.isEmpty()) refreshDrafts(withBody, table) else current.drafts,
+                draftsStale = true,
             )
+        }
+    }
+
+    /** Rebuilds the preview so it matches the current data and template. */
+    fun refreshPreview() {
+        val current = mutableState.value
+        val table = current.table ?: return
+        val missing = templateMissing(table)
+        updateState {
+            current.copy(
+                blockingError = missing.toTemplateError(),
+                missingTemplateVariables = missing,
+                draftsStale = false,
+            ).replaceDrafts(refreshDrafts(current, table))
         }
     }
 
@@ -630,6 +648,7 @@ class SendFlowViewModel(
                         missingTemplateVariables = missing,
                         importId = idFactory(),
                         pendingImport = null,
+                        draftsStale = false,
                     ).replaceDrafts(refreshDrafts(current, table))
                 }
             },
@@ -651,6 +670,7 @@ class SendFlowViewModel(
                         selectedBackupPhoneColumn = null,
                         blockingError = missing.toTemplateError(),
                         missingTemplateVariables = missing,
+                        draftsStale = false,
                     ).replaceDrafts(refreshDrafts(current, table))
                 }
             },
@@ -683,7 +703,8 @@ class SendFlowViewModel(
                         selectedBackupPhoneColumn = selectedBackup,
                         blockingError = missing.toTemplateError(),
                         missingTemplateVariables = missing,
-                    ).replaceDrafts(refreshDrafts(current, table))
+                        draftsStale = true,
+                    )
                 }
             },
             onFailure = { error -> updateState { it.copy(blockingError = error.message ?: "无法处理数据") } },

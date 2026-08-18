@@ -161,6 +161,7 @@ class MainActivity : ComponentActivity() {
                         onDeleteColumn = sendFlowViewModel::deleteColumn,
                         onDraftSelectionChanged = sendFlowViewModel::toggleDraftSelection,
                         onSelectAllDrafts = sendFlowViewModel::selectAllDrafts,
+                        onRefreshPreview = sendFlowViewModel::refreshPreview,
                         onSubscriptionSelected = sendFlowViewModel::selectSubscription,
                         onRequestSimPermission = {
                             simPermissionLauncher.launch(Manifest.permission.READ_PHONE_STATE)

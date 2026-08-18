@@ -226,6 +226,8 @@ fun SmsScreen(
                     selectedRowIds = state.selectedDraftRowIds,
                     enabled = controlsEnabled,
                     onSelectAll = callbacks.onSelectAllDrafts,
+                    draftsStale = state.draftsStale,
+                    onRefresh = callbacks.onRefreshPreview,
                 )
                 MessageReviewList(
                     drafts = state.drafts,

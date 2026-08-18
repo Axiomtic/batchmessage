@@ -11,6 +11,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -63,6 +64,8 @@ fun MessageReviewHeader(
     selectedRowIds: Set<Long>,
     enabled: Boolean,
     onSelectAll: (Boolean) -> Unit,
+    draftsStale: Boolean = false,
+    onRefresh: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val draftIds = drafts.mapTo(mutableSetOf()) { it.rowId }
@@ -89,6 +92,28 @@ fun MessageReviewHeader(
                     tint = MaterialTheme.colorScheme.primary,
                 )
                 Text("短信预览", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                IconButton(
+                    onClick = onRefresh,
+                    enabled = enabled,
+                    modifier = Modifier.testTag("refresh-preview"),
+                ) {
+                    Icon(
+                        painter = painterResource(BulkSmsIcons.Refresh),
+                        contentDescription = "刷新预览",
+                        tint = if (draftsStale) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                    )
+                }
+            }
+            if (draftsStale) {
+                Text(
+                    "预览未更新，点击刷新以同步数据和模板",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
             }
             Text(
                 "共 ${drafts.size} 条，已选 $selectedCount 条",

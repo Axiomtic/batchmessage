@@ -53,6 +53,7 @@ data class BulkSmsCallbacks(
     val onDeleteTemplate: () -> Unit = {},
     val onDraftSelectionChanged: (Long, Boolean) -> Unit = { _, _ -> },
     val onSelectAllDrafts: (Boolean) -> Unit = {},
+    val onRefreshPreview: () -> Unit = {},
     val onRequestSend: () -> Unit = {},
 )
 
