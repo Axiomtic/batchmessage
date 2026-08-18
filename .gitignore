@@ -6,3 +6,8 @@ local.properties
 .superpowers/
 .worktrees/
 .kotlin/
+# UI verification artifacts (emulator screenshots and adb UI hierarchy dumps)
+/*.png
+/*.xml
+# Gradle-generated daemon JVM toolchain configuration
+/gradle/gradle-daemon-jvm.properties
