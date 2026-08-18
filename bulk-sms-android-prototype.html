@@ -1,0 +1,1957 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; style-src 'unsafe-inline' blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; img-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; font-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; media-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; worker-src blob:; connect-src blob: data:; frame-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<title>Bulk Sms Android Prototype</title>
+<style>:root{color-scheme:light dark;background:light-dark(rgb(255 255 255), rgb(24 24 24))}html,body{margin:0}body{box-sizing:border-box;padding:1rem;background:inherit}iframe{display:block;width:100%;height:calc(100vh - 2rem);margin:0 auto;border:0}</style>
+</head>
+<body>
+<iframe sandbox="allow-scripts" referrerpolicy="no-referrer" title="Bulk Sms Android Prototype" srcdoc="&lt;!doctype html&gt;
+&lt;html lang=&quot;en&quot;&gt;
+&lt;head&gt;
+&lt;meta charset=&quot;utf-8&quot;&gt;
+&lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;&gt;
+&lt;meta name=&quot;referrer&quot; content=&quot;no-referrer&quot;&gt;
+&lt;meta http-equiv=&quot;Content-Security-Policy&quot; content=&quot;default-src &#x27;none&#x27;; script-src &#x27;unsafe-inline&#x27; &#x27;unsafe-eval&#x27; &#x27;wasm-unsafe-eval&#x27; blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; style-src &#x27;unsafe-inline&#x27; blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; img-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; font-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; media-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; worker-src blob:; connect-src blob: data:; frame-src &#x27;none&#x27;; object-src &#x27;none&#x27;; base-uri &#x27;none&#x27;; form-action &#x27;none&#x27;&quot;&gt;
+&lt;title&gt;Bulk Sms Android Prototype&lt;/title&gt;
+&lt;style&gt;:root {
+  color-scheme: light dark;
+  background-color: var(
+    --background,
+    var(--color-background-primary, light-dark(rgb(255 255 255), rgb(24 24 24)))
+  ) !important;
+
+  /* Agent-facing contract; keep in sync with SKILL.md. */
+  --background: var(
+    --color-background-primary,
+    light-dark(rgb(255 255 255), rgb(24 24 24))
+  );
+  --foreground: var(
+    --color-text-primary,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --card: color-mix(in oklab, var(--foreground) 5%, var(--background));
+  --card-foreground: var(
+    --color-text-primary,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --popover: var(
+    --color-background-secondary,
+    light-dark(rgb(255 255 255), rgb(45 45 45))
+  );
+  --popover-foreground: var(
+    --color-text-primary,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --primary: var(
+    --color-text-info,
+    light-dark(rgb(51 156 255), rgb(131 195 255))
+  );
+  --primary-foreground: var(
+    --color-text-inverse,
+    light-dark(rgb(255 255 255), rgb(13 13 13))
+  );
+  --secondary: var(
+    --color-background-secondary,
+    light-dark(rgb(255 255 255 / 96%), rgb(54 54 54 / 96%))
+  );
+  --secondary-foreground: var(
+    --color-text-primary,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --muted: color-mix(in srgb, var(--foreground) 10%, transparent);
+  --muted-foreground: var(
+    --color-text-secondary,
+    light-dark(rgb(26 28 31 / 49.4%), rgb(255 255 255 / 49.8%))
+  );
+  --accent: var(
+    --color-background-info,
+    light-dark(rgb(229 242 255), rgb(13 39 63))
+  );
+  --accent-foreground: var(
+    --color-text-info,
+    light-dark(rgb(51 156 255), rgb(131 195 255))
+  );
+  --destructive: var(
+    --color-text-warning,
+    light-dark(rgb(226 85 7), rgb(255 133 73))
+  );
+  --border: var(
+    --color-border-secondary,
+    light-dark(rgb(26 28 31 / 8%), rgb(255 255 255 / 8.2%))
+  );
+  --input: var(
+    --color-border-primary,
+    light-dark(
+      rgb(26 28 31 / 11.8%),
+      color-mix(in oklab, rgb(0 0 0) 10%, transparent)
+    )
+  );
+  --ring: var(
+    --color-ring-primary,
+    light-dark(rgb(51 156 255), rgb(131 195 255 / 76%))
+  );
+  --font-size-base: var(--font-text-md-size, 14px);
+  --blue: light-dark(rgb(51 156 255), rgb(51 156 255));
+  --orange: light-dark(rgb(226 85 7), rgb(251 106 34));
+  --green: light-dark(rgb(0 162 64), rgb(64 201 119));
+  --red: light-dark(rgb(224 46 42), rgb(255 103 100));
+  --purple: light-dark(rgb(146 79 247), rgb(173 123 249));
+  --yellow: light-dark(rgb(255 195 0), rgb(255 210 64));
+  --viz-series-1: var(--primary);
+  --viz-series-2: light-dark(rgb(243 136 59), rgb(245 154 86));
+  --viz-series-3: light-dark(rgb(93 201 119), rgb(116 213 139));
+  --viz-series-4: light-dark(rgb(235 119 177), rgb(240 143 192));
+  --viz-series-5: light-dark(rgb(155 121 236), rgb(170 145 239));
+  --viz-series-6: light-dark(rgb(58 185 177), rgb(90 203 194));
+
+  /* Internal implementation variables; not part of the agent contract. */
+  --font-sans: -apple-system, system-ui, &quot;Segoe UI&quot;, sans-serif;
+  --font-mono:
+    ui-monospace, SFMono-Regular, &quot;SF Mono&quot;, Menlo, Consolas, &quot;Liberation Mono&quot;,
+    monospace;
+  --font-size-normal: max(11px, var(--font-size-base));
+  --font-size-tooltip: calc(var(--font-size-base) - 1px);
+  --font-size-small: max(11px, calc(var(--font-size-base) - 2px));
+  --font-size-h1: calc(var(--font-size-normal) * 1.7142857143);
+  --font-size-h2: calc(var(--font-size-normal) * 1.4285714286);
+  --font-size-h3: calc(var(--font-size-normal) * 1.2857142857);
+  --font-weight-normal: 430;
+  --font-weight-medium: 500;
+  --line-height-normal: calc(var(--font-size-normal) * 1.5);
+  --line-height-tooltip: calc(var(--font-size-tooltip) * 1.4285714286);
+  --line-height-small: calc(var(--font-size-small) + 4px);
+  --radius: var(--border-radius-lg, 12.5px);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-2xl: calc(var(--radius) * 1.6);
+  --radius-full: 9999px;
+  --shadow-sm: 0 1px 2px -1px rgb(0 0 0 / 8%);
+  --checkmark-image: url(&quot;data:image/svg+xml,%3Csvg xmlns=&#x27;http://www.w3.org/2000/svg&#x27; viewBox=&#x27;0 0 17 17&#x27;%3E%3Cpath d=&#x27;M12.8961 3.64101C13.1297 3.41418 13.4984 3.37523 13.7779 3.56581C14.0571 3.75635 14.1554 4.11331 14.0299 4.41347L13.9615 4.53847L7.71151 13.7045C7.59411 13.8767 7.4063 13.9877 7.19881 14.0072C6.99136 14.0267 6.78564 13.9533 6.63826 13.806L2.88826 10.056L2.79842 9.9457C2.6192 9.67407 2.64927 9.30496 2.88826 9.06581C3.12738 8.82669 3.49647 8.79676 3.76815 8.97597L3.8785 9.06581L7.03084 12.2182L12.8053 3.74941L12.8961 3.64101Z&#x27;/%3E%3C/svg%3E&quot;);
+
+  /* Legacy aliases; not part of the current agent contract. */
+  --viz-bg: transparent;
+  --viz-panel: var(--card);
+  --viz-border: var(--border);
+  --viz-text: var(--foreground);
+  --viz-muted: var(--muted-foreground);
+  --viz-accent: var(--primary);
+  --viz-accent-text: var(--primary-foreground);
+  --viz-accent-bg: var(--accent);
+  --viz-font-size: var(--font-size-base);
+  --viz-warning: var(--destructive);
+}
+
+:root[data-theme=&quot;light&quot;] {
+  color-scheme: light;
+}
+
+:root[data-theme=&quot;dark&quot;] {
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html &gt; body {
+  /* Preserve MCP aliases for older inline renderers without creating :root cycles. */
+  --color-background-primary: var(
+    --background,
+    light-dark(rgb(255 255 255), rgb(24 24 24))
+  );
+  --color-text-primary: var(
+    --foreground,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --color-border-secondary: var(
+    --border,
+    light-dark(rgb(26 28 31 / 8%), rgb(255 255 255 / 8.2%))
+  );
+
+  margin: 0;
+  padding: 5px;
+  color: var(--foreground);
+  background: transparent !important;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-normal);
+  font-weight: var(--font-weight-normal);
+  line-height: var(--line-height-normal);
+}
+
+a {
+  color: color-mix(in srgb, var(--viz-accent) 80%, var(--viz-text) 20%);
+  cursor: pointer;
+  font-weight: var(--font-weight-medium, 500);
+  text-decoration: none;
+  text-underline-offset: 2px;
+}
+
+a:is(:hover, :focus-visible) {
+  text-decoration-line: underline;
+  text-decoration-style: dashed;
+  text-decoration-thickness: 0.5px;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p {
+  margin-block: 0;
+}
+
+h1 {
+  font-size: var(--font-size-h1);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.25;
+}
+
+h2 {
+  font-size: var(--font-size-h2);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.25;
+}
+
+h3,
+h4,
+h5,
+h6 {
+  font-size: var(--font-size-h3);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.3;
+}
+
+b,
+strong,
+th {
+  font-weight: var(--font-weight-medium);
+}
+
+code:not(pre code) {
+  display: inline;
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  corner-shape: superellipse(1.5);
+  background: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+  overflow-wrap: anywhere;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  word-break: break-word;
+}
+
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  color: var(--foreground);
+  font: inherit;
+  text-align: start;
+}
+
+.table :is(th, td) {
+  padding-block: 10px;
+  padding-inline: 0 24px;
+  overflow-wrap: anywhere;
+  border-bottom: 1px solid var(--border);
+  text-align: start;
+  vertical-align: top;
+}
+
+.table-responsive &gt; .table :is(th, td) {
+  overflow-wrap: break-word;
+}
+
+.table :is(th, td):last-child {
+  padding-inline-end: 0;
+}
+
+.table :is(caption, thead th) {
+  font-weight: 600;
+}
+
+.table thead th {
+  padding-block: 8px;
+  border-bottom-color: color-mix(in srgb, var(--foreground) 16%, transparent);
+}
+
+.table tbody tr:last-child :is(th, td) {
+  border-bottom: 0;
+}
+
+.table.table-sm :is(th, td) {
+  padding-block: 6px;
+}
+
+.table.table-sm :is(th, td):not(:last-child) {
+  padding-inline-end: 16px;
+}
+
+.table :is(.text-end, [align=&quot;right&quot;]) {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+
+.table :is(.text-center, [align=&quot;center&quot;]) {
+  text-align: center;
+}
+
+.table .text-nowrap {
+  white-space: nowrap;
+}
+
+#widget {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  padding: 0;
+  background: transparent !important;
+}
+
+.card {
+  min-width: 0;
+  padding: 12px;
+  overflow: hidden;
+  overflow-wrap: break-word;
+  border-radius: var(--radius-2xl);
+  corner-shape: superellipse(1.5);
+  color: var(--card-foreground);
+  background: var(--card);
+}
+
+#widget &gt; :not(.card, .progress) {
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.tooltip {
+  position: fixed;
+  z-index: 50;
+  top: 0;
+  left: 0;
+  width: max-content;
+  max-width: min(
+    20rem,
+    var(--tooltip-available-width, calc(100vw - 10px)),
+    calc(100vw - 10px)
+  );
+  max-height: min(
+    var(--tooltip-available-height, calc(100vh - 10px)),
+    calc(100vh - 10px)
+  );
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  corner-shape: superellipse(1.5);
+  color: var(--popover-foreground);
+  background: var(--popover);
+  box-shadow: none;
+  font-size: var(--font-size-tooltip);
+  line-height: var(--line-height-tooltip);
+  overflow-wrap: break-word;
+  white-space: normal;
+  pointer-events: none;
+  user-select: none;
+}
+
+.viz-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(max(180px, 24%), 1fr));
+  gap: 10px;
+}
+
+.viz-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.viz-stat-value {
+  font-size: var(--font-size-h2);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.25;
+}
+
+.viz-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.progress {
+  display: flex;
+  height: 6px;
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--muted);
+}
+
+.progress-bar {
+  height: 100%;
+  flex-shrink: 0;
+  border: 0;
+  background: var(--viz-series-1);
+}
+
+.viz-badge {
+  padding: 3px 8px;
+  border-radius: var(--radius-full);
+  color: var(--accent-foreground);
+  background: var(--accent);
+  font-weight: var(--font-weight-medium);
+}
+
+small,
+.text-small,
+.viz-badge {
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+}
+
+.text-muted {
+  color: var(--muted-foreground);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.viz-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.viz-controls &gt; .form-label {
+  display: grid;
+  min-width: min(100%, 260px);
+  flex: 1 1 280px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 2px 12px;
+  margin-bottom: 0;
+}
+
+.viz-controls &gt; .form-label &gt; :is(.form-control, .form-range, .form-select) {
+  grid-column: 1 / -1;
+}
+
+.btn,
+.form-check-input,
+.form-control,
+.form-range,
+.form-select {
+  font: inherit;
+}
+
+.btn {
+  appearance: button;
+  display: inline-flex;
+  inline-size: fit-content;
+  max-inline-size: 100%;
+  min-height: 28px;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin: 0;
+  padding: 0 8px;
+  -webkit-app-region: no-drag;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-lg);
+  corner-shape: superellipse(1.5);
+  color: var(--secondary-foreground);
+  background: var(--secondary);
+  cursor: var(--cursor-interaction, pointer);
+  text-align: center;
+  text-decoration: none;
+  white-space: nowrap;
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+.btn:is(.btn-block, .viz-tile) {
+  inline-size: 100%;
+}
+
+.btn.viz-tile {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+a.btn {
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.btn:not(:disabled):hover {
+  background: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+}
+
+.btn-primary {
+  border-color: transparent;
+  color: var(--primary-foreground);
+  background: var(--foreground);
+  background-clip: padding-box;
+}
+
+.btn-primary .text-muted {
+  color: color-mix(in srgb, var(--primary-foreground) 50%, transparent);
+}
+
+.btn-primary:not(:disabled):hover {
+  background: color-mix(in srgb, var(--foreground) 80%, transparent);
+  background-clip: padding-box;
+}
+
+.btn-ghost {
+  border-color: transparent;
+  color: var(--muted-foreground);
+  background: transparent;
+}
+
+.btn-ghost:not(:disabled):hover {
+  color: var(--foreground);
+  background: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+}
+
+.btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+[data-lucide] {
+  stroke-width: 1.6;
+}
+
+.form-label {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--foreground);
+}
+
+.form-control {
+  display: block;
+  width: 100%;
+  min-height: 28px;
+  padding: 0 8px;
+  outline: none;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-lg);
+  corner-shape: superellipse(1.5);
+  color: var(--foreground);
+  background: var(--secondary);
+}
+
+.form-control::placeholder {
+  color: var(--muted-foreground);
+}
+
+.form-control[type=&quot;file&quot;] {
+  padding: 0;
+  overflow: hidden;
+  cursor: var(--cursor-interaction, pointer);
+}
+
+.form-control[type=&quot;file&quot;]::file-selector-button {
+  min-height: 26px;
+  margin-right: 8px;
+  padding: 0 8px;
+  border: 0;
+  border-right: 1px solid var(--input);
+  color: var(--secondary-foreground);
+  background: var(--secondary);
+  cursor: inherit;
+  font: inherit;
+}
+
+.form-control[type=&quot;file&quot;]:not(:disabled):hover::file-selector-button {
+  background: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+}
+
+.form-control-color[type=&quot;color&quot;] {
+  width: 40px;
+  height: 28px;
+  padding: 3px;
+  cursor: var(--cursor-interaction, pointer);
+}
+
+.form-control-color[type=&quot;color&quot;]::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.form-control-color[type=&quot;color&quot;]::-webkit-color-swatch {
+  border: 0;
+  border-radius: calc(var(--radius-lg) - 4px);
+  corner-shape: superellipse(1.5);
+}
+
+textarea.form-control {
+  height: auto;
+  min-height: 72px;
+  padding: 8px 10px;
+  resize: vertical;
+}
+
+.form-control:focus-visible {
+  border-color: var(--ring);
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.form-control:disabled,
+.form-select:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.form-select {
+  appearance: none;
+  display: block;
+  width: 100%;
+  min-height: 28px;
+  margin: 0;
+  padding: 0 32px 0 8px;
+  outline: none;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-lg);
+  corner-shape: superellipse(1.5);
+  color: var(--foreground);
+  background-color: var(--secondary);
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--muted-foreground) 50%),
+    linear-gradient(135deg, var(--muted-foreground) 50%, transparent 50%);
+  background-position:
+    calc(100% - 14px) 50%,
+    calc(100% - 10px) 50%;
+  background-repeat: no-repeat;
+  background-size: 4px 4px;
+  cursor: var(--cursor-interaction, default);
+}
+
+.form-select:not(:disabled):hover {
+  background-color: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+}
+
+.form-select:focus-visible {
+  border-color: var(--ring);
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.form-check {
+  display: flex;
+  min-height: 20px;
+  align-items: center;
+  gap: 6px;
+}
+
+.form-check-input {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  margin: 0;
+  border: 1px solid var(--input);
+  color: var(--primary-foreground);
+  background-color: transparent;
+  cursor: var(--cursor-interaction, default);
+  transition:
+    background-color 150ms,
+    border-color 150ms,
+    box-shadow 150ms;
+}
+
+.form-check:not(.form-switch) .form-check-input[type=&quot;checkbox&quot;] {
+  border-color: var(--input);
+  border-radius: var(--radius-sm);
+  corner-shape: superellipse(1.5);
+  background-color: var(--secondary);
+  box-shadow: var(--shadow-sm);
+}
+
+.form-check:not(.form-switch)
+  .form-check-input:not(:disabled):not(:checked):hover {
+  background-color: var(--card);
+}
+
+.form-check:not(.form-switch) .form-check-input[type=&quot;checkbox&quot;]:checked {
+  border-color: var(--primary);
+  background-color: var(--primary);
+}
+
+.form-check:not(.form-switch)
+  .form-check-input[type=&quot;checkbox&quot;]:checked::before {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--primary-foreground);
+  content: &quot;&quot;;
+  mask: var(--checkmark-image) center / 12px 12px no-repeat;
+}
+
+.form-check-input[type=&quot;radio&quot;] {
+  width: 14px;
+  height: 14px;
+  border-radius: var(--radius-full);
+}
+
+.form-check-input[type=&quot;radio&quot;]:checked {
+  border: 2px solid var(--primary);
+  background:
+    radial-gradient(circle, var(--primary-foreground) 0 2.5px, transparent 3px),
+    var(--primary);
+}
+
+.form-check:not(.form-switch) .form-check-input:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.form-check:not(.form-switch) .form-check-input:disabled {
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.form-check:not(.form-switch) .form-check-input:disabled + .form-check-label {
+  cursor: not-allowed;
+}
+
+.form-switch .form-check-input:disabled,
+.form-switch .form-check-input:disabled + .form-check-label {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.form-check-label {
+  color: var(--foreground);
+  cursor: var(--cursor-interaction, default);
+}
+
+.form-switch .form-check-input {
+  position: relative;
+  width: 32px;
+  height: 20px;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--muted);
+  box-shadow: none;
+  transition: background-color 200ms cubic-bezier(0, 0, 0.2, 1);
+}
+
+.form-switch .form-check-input::before {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 16px;
+  height: 16px;
+  box-sizing: border-box;
+  border: 1px solid light-dark(var(--primary-foreground), var(--foreground));
+  border-radius: var(--radius-full);
+  background: light-dark(var(--primary-foreground), var(--foreground));
+  box-shadow: var(--shadow-sm);
+  content: &quot;&quot;;
+  transform: translate(2px, -50%);
+  transition: transform 200ms cubic-bezier(0, 0, 0.2, 1);
+}
+
+.form-switch .form-check-input:checked {
+  background: var(--primary);
+}
+
+.form-switch .form-check-input:checked::before {
+  transform: translate(14px, -50%);
+}
+
+.form-switch .form-check-input:focus-visible {
+  box-shadow: 0 0 0 2px var(--ring);
+}
+
+.form-range {
+  appearance: none;
+  display: block;
+  width: 100%;
+  height: 28px;
+  flex: 1;
+  margin: 0;
+  padding: 0;
+  outline: none;
+  border: 0;
+  accent-color: var(--primary);
+  background: linear-gradient(
+      color-mix(in srgb, var(--foreground) 7%, transparent),
+      color-mix(in srgb, var(--foreground) 7%, transparent)
+    )
+    center / 100% 2px no-repeat;
+}
+
+.form-range::-webkit-slider-runnable-track {
+  height: 28px;
+  background: transparent;
+}
+
+.form-range::-webkit-slider-thumb {
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  margin-top: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: light-dark(var(--primary-foreground), var(--foreground));
+}
+
+.form-range:focus-visible::-webkit-slider-thumb {
+  border-color: var(--ring);
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.form-range::-moz-range-track {
+  height: 28px;
+  background: transparent;
+}
+
+.form-range::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: light-dark(var(--primary-foreground), var(--foreground));
+}
+
+.form-range:focus-visible::-moz-range-thumb {
+  border-color: var(--ring);
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.form-range:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.btn:not(.btn-primary, .viz-tile):is(
+  [aria-pressed=&quot;true&quot;],
+  [aria-selected=&quot;true&quot;],
+  .is-selected
+) {
+  border-color: var(--primary);
+  color: var(--primary-foreground);
+  background: var(--primary);
+}
+
+.btn.viz-tile:is([aria-pressed=&quot;true&quot;], [aria-selected=&quot;true&quot;], .is-selected) {
+  border-color: var(--primary);
+  box-shadow: inset 0 0 0 1px var(--primary);
+}
+
+.btn:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+#widget &gt; svg {
+  width: 100%;
+}
+
+/* Model-authored chart rules can otherwise stretch icons after these styles load. */
+svg.lucide {
+  display: block;
+  width: 16px !important;
+  height: 16px !important;
+  flex: none;
+  margin: 0 !important;
+  stroke-width: 1.6;
+}
+
+.text-warning,
+.text-destructive {
+  color: var(--destructive);
+}
+
+html&gt;body{padding:0}&lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;style&gt;
+  #sms-workbench-prototype {
+    --sms-primary: #176b4a;
+    --sms-primary-strong: #0f573b;
+    --sms-primary-soft: #dff3e8;
+    --sms-primary-faint: #f2faf6;
+    --sms-surface: #ffffff;
+    --sms-bg: #eef5f1;
+    --sms-text: #17211c;
+    --sms-muted: #5f6f67;
+    --sms-line: #c9d8d0;
+    --sms-danger: #b3261e;
+    --sms-shadow: rgba(20, 55, 39, 0.16);
+    width: 100%;
+    display: grid;
+    place-items: center;
+    padding: 12px 0;
+    color: var(--sms-text);
+    font-family: Roboto, &quot;Noto Sans SC&quot;, &quot;Microsoft YaHei&quot;, sans-serif;
+    color-scheme: light;
+  }
+
+  #sms-workbench-prototype * { box-sizing: border-box; }
+
+  #sms-workbench-prototype .sms-phone {
+    width: min(100%, 412px);
+    height: 844px;
+    max-height: 88vh;
+    min-height: 680px;
+    display: grid;
+    grid-template-rows: 54px minmax(210px, 2.05fr) minmax(142px, 1.18fr) minmax(180px, 1.62fr) 78px;
+    overflow: hidden;
+    background: var(--sms-bg);
+    border: 1px solid var(--sms-line);
+    border-radius: 24px;
+    box-shadow: 0 16px 44px var(--sms-shadow);
+  }
+
+  #sms-workbench-prototype button,
+  #sms-workbench-prototype input,
+  #sms-workbench-prototype select,
+  #sms-workbench-prototype textarea { font: inherit; }
+
+  #sms-workbench-prototype button {
+    min-height: 34px;
+    border: 1px solid var(--sms-line);
+    border-radius: 10px;
+    padding: 6px 10px;
+    color: var(--sms-primary-strong);
+    background: var(--sms-surface);
+    cursor: pointer;
+  }
+
+  #sms-workbench-prototype button:hover { background: var(--sms-primary-faint); }
+  #sms-workbench-prototype button:active { transform: translateY(1px); }
+
+  #sms-workbench-prototype .sms-icon-button {
+    width: 34px;
+    padding: 5px;
+    display: inline-grid;
+    place-items: center;
+  }
+
+  #sms-workbench-prototype .sms-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 14px 0 18px;
+    color: #ffffff;
+    background: var(--sms-primary);
+  }
+
+  #sms-workbench-prototype .sms-title {
+    font-size: 19px;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+  }
+
+  #sms-workbench-prototype .sms-top-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    min-height: 36px;
+    border: 0;
+    color: #ffffff;
+    background: transparent;
+    padding: 5px 4px;
+  }
+
+  #sms-workbench-prototype .sms-panel {
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    padding: 8px 10px;
+    background: var(--sms-surface);
+    border-bottom: 1px solid var(--sms-line);
+  }
+
+  #sms-workbench-prototype .sms-panel-head,
+  #sms-workbench-prototype .sms-toolbar,
+  #sms-workbench-prototype .sms-review-head,
+  #sms-workbench-prototype .sms-save-row,
+  #sms-workbench-prototype .sms-bottom,
+  #sms-workbench-prototype .sms-sim-options {
+    display: flex;
+    align-items: center;
+  }
+
+  #sms-workbench-prototype .sms-panel-head {
+    justify-content: space-between;
+    min-height: 34px;
+    gap: 8px;
+  }
+
+  #sms-workbench-prototype .sms-section-title {
+    font-size: 15px;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  #sms-workbench-prototype .sms-toolbar {
+    gap: 5px;
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  #sms-workbench-prototype .sms-toolbar::-webkit-scrollbar { display: none; }
+
+  #sms-workbench-prototype .sms-toolbar button {
+    min-height: 32px;
+    white-space: nowrap;
+    padding: 5px 8px;
+    font-size: 12px;
+  }
+
+  #sms-workbench-prototype .sms-button-content {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  #sms-workbench-prototype .sms-table-wrap {
+    position: relative;
+    min-height: 0;
+    flex: 1;
+    overflow: auto;
+    border: 1px solid var(--sms-line);
+    border-radius: 10px;
+    background: var(--sms-surface);
+  }
+
+  #sms-workbench-prototype .sms-grid {
+    border-collapse: separate;
+    border-spacing: 0;
+    min-width: 100%;
+    width: auto;
+    table-layout: fixed;
+    font-size: 12px;
+  }
+
+  #sms-workbench-prototype .sms-grid th,
+  #sms-workbench-prototype .sms-grid td {
+    height: 38px;
+    padding: 5px 7px;
+    border-right: 1px solid var(--sms-line);
+    border-bottom: 1px solid var(--sms-line);
+    background: var(--sms-surface);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  #sms-workbench-prototype .sms-grid th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    font-weight: 500;
+    color: var(--sms-primary-strong);
+    background: var(--sms-primary-soft);
+  }
+
+  #sms-workbench-prototype .sms-grid .sms-row-number {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    width: 38px;
+    text-align: center;
+    color: var(--sms-muted);
+    background: var(--sms-primary-faint);
+  }
+
+  #sms-workbench-prototype .sms-grid th.sms-row-number { z-index: 3; }
+
+  #sms-workbench-prototype .sms-grid [contenteditable=&quot;true&quot;]:focus {
+    outline: 2px solid var(--sms-primary);
+    outline-offset: -2px;
+    background: var(--sms-primary-faint);
+  }
+
+  #sms-workbench-prototype .sms-overflow-menu {
+    position: absolute;
+    top: 44px;
+    right: 8px;
+    z-index: 10;
+    display: none;
+    width: 145px;
+    padding: 6px;
+    border: 1px solid var(--sms-line);
+    border-radius: 12px;
+    background: var(--sms-surface);
+    box-shadow: 0 8px 24px var(--sms-shadow);
+  }
+
+  #sms-workbench-prototype .sms-overflow-menu.is-open { display: grid; }
+  #sms-workbench-prototype .sms-overflow-menu button { border: 0; text-align: left; }
+  #sms-workbench-prototype .sms-overflow-menu .sms-danger { color: var(--sms-danger); }
+
+  #sms-workbench-prototype .sms-template-panel { gap: 6px; }
+
+  #sms-workbench-prototype .sms-template-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    gap: 5px;
+  }
+
+  #sms-workbench-prototype .sms-template-row select,
+  #sms-workbench-prototype .sms-template-editor,
+  #sms-workbench-prototype .sms-message-editor,
+  #sms-workbench-prototype .sms-manager-editor {
+    width: 100%;
+    border: 1px solid var(--sms-line);
+    border-radius: 10px;
+    color: var(--sms-text);
+    background: var(--sms-surface);
+  }
+
+  #sms-workbench-prototype .sms-template-row select { min-width: 0; padding: 5px 7px; }
+  #sms-workbench-prototype .sms-template-row button { min-height: 34px; padding: 5px 7px; font-size: 12px; }
+
+  #sms-workbench-prototype .sms-template-editor {
+    min-height: 64px;
+    flex: 1;
+    resize: none;
+    padding: 8px;
+    line-height: 1.45;
+    font-size: 12px;
+  }
+
+  #sms-workbench-prototype .sms-review-panel { padding-bottom: 6px; }
+
+  #sms-workbench-prototype .sms-review-head {
+    min-height: 38px;
+    justify-content: space-between;
+    gap: 7px;
+  }
+
+  #sms-workbench-prototype .sms-count { color: var(--sms-primary); }
+
+  #sms-workbench-prototype .sms-bulk-actions {
+    display: flex;
+    gap: 3px;
+  }
+
+  #sms-workbench-prototype .sms-bulk-actions button {
+    min-height: 30px;
+    border: 0;
+    padding: 3px 5px;
+    font-size: 11px;
+    background: transparent;
+  }
+
+  #sms-workbench-prototype .sms-bulk-actions .sms-unsync-all { color: var(--sms-danger); }
+
+  #sms-workbench-prototype .sms-message-list {
+    min-height: 0;
+    flex: 1;
+    overflow-y: auto;
+    display: grid;
+    gap: 7px;
+    align-content: start;
+    padding-right: 3px;
+  }
+
+  #sms-workbench-prototype .sms-message-item {
+    display: grid;
+    gap: 6px;
+    padding: 8px;
+    border: 1px solid var(--sms-line);
+    border-radius: 10px;
+    background: var(--sms-surface);
+  }
+
+  #sms-workbench-prototype .sms-message-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+  }
+
+  #sms-workbench-prototype .sms-phone-number { font-weight: 500; }
+
+  #sms-workbench-prototype .sms-sync-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--sms-primary-strong);
+    white-space: nowrap;
+  }
+
+  #sms-workbench-prototype .sms-sync-label input { accent-color: var(--sms-primary); }
+
+  #sms-workbench-prototype .sms-message-editor {
+    min-height: 58px;
+    resize: vertical;
+    padding: 7px;
+    line-height: 1.45;
+    font-size: 12px;
+  }
+
+  #sms-workbench-prototype .sms-bottom {
+    justify-content: space-between;
+    gap: 8px;
+    padding: 9px 10px;
+    background: var(--sms-surface);
+    box-shadow: 0 -3px 12px rgba(20, 55, 39, 0.08);
+  }
+
+  #sms-workbench-prototype .sms-sim-options { gap: 9px; }
+  #sms-workbench-prototype .sms-sim-options label { display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; font-size: 12px; }
+  #sms-workbench-prototype .sms-sim-options input { accent-color: var(--sms-primary); }
+  #sms-workbench-prototype .sms-send-summary { font-size: 12px; white-space: nowrap; }
+
+  #sms-workbench-prototype .sms-send-button {
+    min-height: 48px;
+    border: 0;
+    padding: 8px 13px;
+    color: #ffffff;
+    background: var(--sms-primary);
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  #sms-workbench-prototype .sms-send-button:hover { background: var(--sms-primary-strong); }
+
+  #sms-workbench-prototype .sms-dialog-backdrop {
+    position: absolute;
+    inset: 0;
+    z-index: 30;
+    display: none;
+    place-items: center;
+    padding: 22px;
+    background: rgba(7, 28, 18, 0.48);
+  }
+
+  #sms-workbench-prototype .sms-dialog-backdrop.is-open { display: grid; }
+
+  #sms-workbench-prototype .sms-dialog {
+    width: 100%;
+    padding: 18px;
+    border-radius: 18px;
+    color: var(--sms-text);
+    background: var(--sms-surface);
+    box-shadow: 0 18px 48px var(--sms-shadow);
+  }
+
+  #sms-workbench-prototype .sms-dialog h3 { margin: 0 0 8px; font-size: 18px; font-weight: 500; }
+  #sms-workbench-prototype .sms-dialog p { margin: 0 0 16px; color: var(--sms-muted); font-size: 13px; line-height: 1.55; }
+  #sms-workbench-prototype .sms-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; }
+  #sms-workbench-prototype .sms-dialog-confirm { border-color: var(--sms-primary); color: #ffffff; background: var(--sms-primary); }
+
+  #sms-workbench-prototype .sms-toast {
+    position: absolute;
+    left: 50%;
+    bottom: 88px;
+    z-index: 40;
+    transform: translateX(-50%) translateY(12px);
+    max-width: calc(100% - 36px);
+    padding: 9px 14px;
+    border-radius: 999px;
+    color: #ffffff;
+    background: #26352d;
+    opacity: 0;
+    pointer-events: none;
+    transition: 160ms ease;
+    white-space: nowrap;
+    font-size: 12px;
+  }
+
+  #sms-workbench-prototype .sms-toast.is-visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  #sms-workbench-prototype .sms-manager {
+    position: absolute;
+    inset: 0;
+    z-index: 20;
+    display: none;
+    grid-template-rows: 54px 1fr 70px;
+    background: var(--sms-bg);
+  }
+
+  #sms-workbench-prototype .sms-manager.is-open { display: grid; }
+
+  #sms-workbench-prototype .sms-manager-top {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 12px;
+    color: #ffffff;
+    background: var(--sms-primary);
+  }
+
+  #sms-workbench-prototype .sms-manager-top button { border: 0; color: #ffffff; background: transparent; }
+
+  #sms-workbench-prototype .sms-manager-main {
+    min-height: 0;
+    display: grid;
+    grid-template-rows: auto 1fr;
+    gap: 10px;
+    padding: 12px;
+    overflow: hidden;
+  }
+
+  #sms-workbench-prototype .sms-template-list { display: grid; gap: 7px; }
+  #sms-workbench-prototype .sms-template-choice { text-align: left; }
+  #sms-workbench-prototype .sms-template-choice.is-selected { border-color: var(--sms-primary); background: var(--sms-primary-soft); }
+  #sms-workbench-prototype .sms-manager-editor { min-height: 0; resize: none; padding: 12px; line-height: 1.55; }
+
+  #sms-workbench-prototype .sms-manager-actions {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 7px;
+    padding: 10px 12px;
+    background: var(--sms-surface);
+    border-top: 1px solid var(--sms-line);
+  }
+
+  #sms-workbench-prototype .sms-manager-actions .sms-delete-template { margin-right: auto; color: var(--sms-danger); }
+  #sms-workbench-prototype .sms-manager-actions .sms-primary-action { border-color: var(--sms-primary); color: #ffffff; background: var(--sms-primary); }
+
+  #sms-workbench-prototype .sms-phone { position: relative; }
+
+  @media (max-width: 390px) {
+    #sms-workbench-prototype { padding: 0; }
+    #sms-workbench-prototype .sms-phone { border-radius: 0; border-left: 0; border-right: 0; max-height: none; height: 800px; }
+    #sms-workbench-prototype .sms-title { font-size: 17px; }
+    #sms-workbench-prototype .sms-toolbar button { padding-inline: 6px; }
+    #sms-workbench-prototype .sms-bottom { gap: 5px; }
+    #sms-workbench-prototype .sms-send-button { padding-inline: 10px; }
+  }
+&lt;/style&gt;
+
+&lt;div id=&quot;sms-workbench-prototype&quot;&gt;
+  &lt;section class=&quot;sms-phone&quot; aria-label=&quot;批量短信助手 Android 竖屏交互原型&quot;&gt;
+    &lt;header class=&quot;sms-topbar&quot;&gt;
+      &lt;div class=&quot;sms-title&quot;&gt;批量短信助手&lt;/div&gt;
+      &lt;button type=&quot;button&quot; class=&quot;sms-top-action&quot; data-action=&quot;open-manager&quot;&gt;&lt;i data-lucide=&quot;notebook-tabs&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;&lt;span&gt;模板管理&lt;/span&gt;&lt;/button&gt;
+    &lt;/header&gt;
+
+    &lt;section class=&quot;sms-panel sms-data-panel&quot; aria-labelledby=&quot;sms-data-heading&quot;&gt;
+      &lt;div class=&quot;sms-panel-head&quot;&gt;
+        &lt;div class=&quot;sms-section-title&quot; id=&quot;sms-data-heading&quot;&gt;数据表格&lt;/div&gt;
+        &lt;div class=&quot;sms-toolbar&quot; aria-label=&quot;表格操作&quot;&gt;
+          &lt;button type=&quot;button&quot; data-action=&quot;import-excel&quot;&gt;&lt;span class=&quot;sms-button-content&quot;&gt;&lt;i data-lucide=&quot;sheet&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;Excel&lt;/span&gt;&lt;/button&gt;
+          &lt;button type=&quot;button&quot; data-action=&quot;import-clipboard&quot;&gt;&lt;span class=&quot;sms-button-content&quot;&gt;&lt;i data-lucide=&quot;clipboard&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;剪切板&lt;/span&gt;&lt;/button&gt;
+          &lt;button type=&quot;button&quot; data-action=&quot;add-row&quot;&gt;&lt;span class=&quot;sms-button-content&quot;&gt;&lt;i data-lucide=&quot;rows-3&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;加行&lt;/span&gt;&lt;/button&gt;
+          &lt;button type=&quot;button&quot; data-action=&quot;add-column&quot;&gt;&lt;span class=&quot;sms-button-content&quot;&gt;&lt;i data-lucide=&quot;columns-3&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;加列&lt;/span&gt;&lt;/button&gt;
+          &lt;button type=&quot;button&quot; class=&quot;sms-icon-button&quot; aria-label=&quot;更多表格操作&quot; data-action=&quot;toggle-overflow&quot;&gt;&lt;i data-lucide=&quot;ellipsis-vertical&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;&lt;/button&gt;
+        &lt;/div&gt;
+      &lt;/div&gt;
+      &lt;div class=&quot;sms-table-wrap&quot; aria-label=&quot;可编辑数据表格&quot;&gt;
+        &lt;table class=&quot;sms-grid&quot;&gt;&lt;/table&gt;
+      &lt;/div&gt;
+      &lt;div class=&quot;sms-overflow-menu&quot; role=&quot;menu&quot;&gt;
+        &lt;button type=&quot;button&quot; data-action=&quot;delete-row&quot;&gt;删除最后一行&lt;/button&gt;
+        &lt;button type=&quot;button&quot; data-action=&quot;delete-column&quot;&gt;删除最后一列&lt;/button&gt;
+        &lt;button type=&quot;button&quot; class=&quot;sms-danger&quot; data-action=&quot;clear-table&quot;&gt;清空表格&lt;/button&gt;
+      &lt;/div&gt;
+    &lt;/section&gt;
+
+    &lt;section class=&quot;sms-panel sms-template-panel&quot; aria-labelledby=&quot;sms-template-heading&quot;&gt;
+      &lt;div class=&quot;sms-panel-head&quot;&gt;
+        &lt;div class=&quot;sms-section-title&quot; id=&quot;sms-template-heading&quot;&gt;现场模板&lt;/div&gt;
+        &lt;span class=&quot;sms-count&quot; data-role=&quot;live-status&quot;&gt;实时同步&lt;/span&gt;
+      &lt;/div&gt;
+      &lt;div class=&quot;sms-template-row&quot;&gt;
+        &lt;select aria-label=&quot;选择短信模板&quot; data-role=&quot;template-select&quot;&gt;
+          &lt;option&gt;服务到期提醒&lt;/option&gt;
+        &lt;/select&gt;
+        &lt;button type=&quot;button&quot; data-action=&quot;overwrite-template&quot;&gt;覆盖保存&lt;/button&gt;
+        &lt;button type=&quot;button&quot; data-action=&quot;save-template-as&quot;&gt;另存为&lt;/button&gt;
+      &lt;/div&gt;
+      &lt;textarea class=&quot;sms-template-editor&quot; aria-label=&quot;现场编辑短信模板&quot;&gt;您好，{名字}，您的服务将于{服务到期日期}到期，请及时办理续期。如已办理，请忽略本短信。&lt;/textarea&gt;
+    &lt;/section&gt;
+
+    &lt;section class=&quot;sms-panel sms-review-panel&quot; aria-labelledby=&quot;sms-review-heading&quot;&gt;
+      &lt;div class=&quot;sms-review-head&quot;&gt;
+        &lt;div class=&quot;sms-section-title&quot; id=&quot;sms-review-heading&quot;&gt;待发送短信 &lt;span class=&quot;sms-count&quot; data-role=&quot;message-count&quot;&gt;2 条&lt;/span&gt;&lt;/div&gt;
+        &lt;div class=&quot;sms-bulk-actions&quot;&gt;
+          &lt;button type=&quot;button&quot; data-action=&quot;sync-all&quot;&gt;&lt;i data-lucide=&quot;refresh-cw&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt; 全部同步&lt;/button&gt;
+          &lt;button type=&quot;button&quot; class=&quot;sms-unsync-all&quot; data-action=&quot;unsync-all&quot;&gt;&lt;i data-lucide=&quot;unlink&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt; 全部取消&lt;/button&gt;
+        &lt;/div&gt;
+      &lt;/div&gt;
+      &lt;div class=&quot;sms-message-list&quot; aria-live=&quot;polite&quot;&gt;&lt;/div&gt;
+    &lt;/section&gt;
+
+    &lt;footer class=&quot;sms-bottom&quot;&gt;
+      &lt;div class=&quot;sms-sim-options&quot; role=&quot;radiogroup&quot; aria-label=&quot;选择发送 SIM 卡&quot;&gt;
+        &lt;label&gt;&lt;input type=&quot;radio&quot; name=&quot;prototype-sim&quot; value=&quot;1&quot; checked&gt;SIM 1&lt;/label&gt;
+        &lt;label&gt;&lt;input type=&quot;radio&quot; name=&quot;prototype-sim&quot; value=&quot;2&quot;&gt;SIM 2&lt;/label&gt;
+      &lt;/div&gt;
+      &lt;div class=&quot;sms-send-summary&quot;&gt;待发送 &lt;strong class=&quot;sms-count&quot; data-role=&quot;footer-count&quot;&gt;2&lt;/strong&gt; 条&lt;/div&gt;
+      &lt;button type=&quot;button&quot; class=&quot;sms-send-button&quot; data-action=&quot;send&quot;&gt;确认并发送&lt;/button&gt;
+    &lt;/footer&gt;
+
+    &lt;div class=&quot;sms-dialog-backdrop&quot; data-role=&quot;overwrite-dialog&quot; aria-hidden=&quot;true&quot;&gt;
+      &lt;div class=&quot;sms-dialog&quot; role=&quot;dialog&quot; aria-modal=&quot;true&quot; aria-labelledby=&quot;sms-overwrite-title&quot;&gt;
+        &lt;h3 id=&quot;sms-overwrite-title&quot;&gt;覆盖现有数据？&lt;/h3&gt;
+        &lt;p&gt;导入将替换当前表格。已取消“与表同步”的短信会保留不动，其余短信将按新数据重新生成。&lt;/p&gt;
+        &lt;div class=&quot;sms-dialog-actions&quot;&gt;
+          &lt;button type=&quot;button&quot; data-action=&quot;cancel-import&quot;&gt;取消&lt;/button&gt;
+          &lt;button type=&quot;button&quot; class=&quot;sms-dialog-confirm&quot; data-action=&quot;confirm-import&quot;&gt;覆盖并导入&lt;/button&gt;
+        &lt;/div&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+
+    &lt;section class=&quot;sms-manager&quot; aria-label=&quot;模板管理页面&quot;&gt;
+      &lt;header class=&quot;sms-manager-top&quot;&gt;
+        &lt;button type=&quot;button&quot; class=&quot;sms-icon-button&quot; aria-label=&quot;返回主页面&quot; data-action=&quot;close-manager&quot;&gt;&lt;i data-lucide=&quot;arrow-left&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;&lt;/button&gt;
+        &lt;div class=&quot;sms-title&quot;&gt;模板管理&lt;/div&gt;
+      &lt;/header&gt;
+      &lt;div class=&quot;sms-manager-main&quot;&gt;
+        &lt;div class=&quot;sms-template-list&quot;&gt;
+          &lt;button type=&quot;button&quot; class=&quot;sms-template-choice is-selected&quot;&gt;服务到期提醒&lt;/button&gt;
+        &lt;/div&gt;
+        &lt;textarea class=&quot;sms-manager-editor&quot; aria-label=&quot;编辑所选模板&quot;&gt;您好，{名字}，您的服务将于{服务到期日期}到期，请及时办理续期。如已办理，请忽略本短信。&lt;/textarea&gt;
+      &lt;/div&gt;
+      &lt;div class=&quot;sms-manager-actions&quot;&gt;
+        &lt;button type=&quot;button&quot; class=&quot;sms-delete-template&quot; data-action=&quot;delete-template&quot;&gt;删除&lt;/button&gt;
+        &lt;button type=&quot;button&quot; data-action=&quot;manager-save-as&quot;&gt;另存为&lt;/button&gt;
+        &lt;button type=&quot;button&quot; class=&quot;sms-primary-action&quot; data-action=&quot;manager-overwrite&quot;&gt;覆盖保存&lt;/button&gt;
+      &lt;/div&gt;
+    &lt;/section&gt;
+
+    &lt;div class=&quot;sms-toast&quot; role=&quot;status&quot; aria-live=&quot;polite&quot;&gt;&lt;/div&gt;
+  &lt;/section&gt;
+&lt;/div&gt;
+
+&lt;script&gt;
+(() =&gt; {
+  const root = document.getElementById(&#x27;sms-workbench-prototype&#x27;);
+  if (!root) return;
+
+  const state = {
+    headers: [&#x27;名字&#x27;, &#x27;电话&#x27;, &#x27;服务到期日期&#x27;],
+    rows: [
+      [&#x27;张三&#x27;, &#x27;13800138000&#x27;, &#x27;2026-09-30&#x27;],
+      [&#x27;李四&#x27;, &#x27;13900139000&#x27;, &#x27;2026-10-15&#x27;],
+      [&#x27;&#x27;, &#x27;&#x27;, &#x27;&#x27;],
+      [&#x27;&#x27;, &#x27;&#x27;, &#x27;&#x27;],
+      [&#x27;&#x27;, &#x27;&#x27;, &#x27;&#x27;]
+    ],
+    messages: [],
+    pendingImport: null
+  };
+
+  const grid = root.querySelector(&#x27;.sms-grid&#x27;);
+  const messageList = root.querySelector(&#x27;.sms-message-list&#x27;);
+  const templateEditor = root.querySelector(&#x27;.sms-template-editor&#x27;);
+  const managerEditor = root.querySelector(&#x27;.sms-manager-editor&#x27;);
+  const overwriteDialog = root.querySelector(&#x27;[data-role=&quot;overwrite-dialog&quot;]&#x27;);
+  const overflowMenu = root.querySelector(&#x27;.sms-overflow-menu&#x27;);
+  const manager = root.querySelector(&#x27;.sms-manager&#x27;);
+  const toast = root.querySelector(&#x27;.sms-toast&#x27;);
+  let toastTimer;
+
+  function escapeHtml(value) {
+    return String(value ?? &#x27;&#x27;)
+      .replaceAll(&#x27;&amp;&#x27;, &#x27;&amp;amp;&#x27;)
+      .replaceAll(&#x27;&lt;&#x27;, &#x27;&amp;lt;&#x27;)
+      .replaceAll(&#x27;&gt;&#x27;, &#x27;&amp;gt;&#x27;)
+      .replaceAll(&#x27;&quot;&#x27;, &#x27;&amp;quot;&#x27;)
+      .replaceAll(&quot;&#x27;&quot;, &#x27;&amp;#039;&#x27;);
+  }
+
+  function rowHasData(row) {
+    return row.some(cell =&gt; String(cell).trim() !== &#x27;&#x27;);
+  }
+
+  function getPhone(row) {
+    const phoneIndex = state.headers.findIndex(header =&gt; header === &#x27;电话&#x27;);
+    return phoneIndex &gt;= 0 ? String(row[phoneIndex] || &#x27;&#x27;) : &#x27;&#x27;;
+  }
+
+  function renderTemplate(row) {
+    const values = Object.fromEntries(state.headers.map((header, index) =&gt; [header, row[index] || &#x27;&#x27;]));
+    return templateEditor.value.replace(/\{([^{}]+)\}/g, (match, key) =&gt; Object.prototype.hasOwnProperty.call(values, key) ? values[key] : match);
+  }
+
+  function contentUnits(value) {
+    return Array.from(String(value ?? &#x27;&#x27;)).reduce((total, character) =&gt; total + (/[^\u0000-\u00ff]/.test(character) ? 2 : 1), 0);
+  }
+
+  function calculateColumnWidth(columnIndex) {
+    const candidates = [state.headers[columnIndex], ...state.rows.map(row =&gt; row[columnIndex] || &#x27;&#x27;)];
+    const longest = Math.max(...candidates.map(contentUnits), 1);
+    return Math.min(240, Math.max(76, Math.ceil(longest * 7.2 + 24)));
+  }
+
+  function refreshColumnWidths() {
+    const widths = state.headers.map((_, index) =&gt; calculateColumnWidth(index));
+    grid.querySelectorAll(&#x27;col[data-column-index]&#x27;).forEach(column =&gt; {
+      const index = Number(column.dataset.columnIndex);
+      column.style.width = `${widths[index]}px`;
+    });
+    const availableWidth = grid.parentElement ? grid.parentElement.clientWidth - 2 : 0;
+    grid.style.width = `${Math.max(38 + widths.reduce((sum, width) =&gt; sum + width, 0), availableWidth)}px`;
+  }
+
+  function renderGrid() {
+    const columnDefinitions = state.headers.map((_, index) =&gt; `&lt;col data-column-index=&quot;${index}&quot;&gt;`).join(&#x27;&#x27;);
+    const columns = state.headers.map((header, index) =&gt; `&lt;th contenteditable=&quot;true&quot; data-header-index=&quot;${index}&quot;&gt;${escapeHtml(header)}&lt;/th&gt;`).join(&#x27;&#x27;);
+    const rows = state.rows.map((row, rowIndex) =&gt; {
+      const cells = state.headers.map((_, columnIndex) =&gt; `&lt;td contenteditable=&quot;true&quot; data-row-index=&quot;${rowIndex}&quot; data-column-index=&quot;${columnIndex}&quot;&gt;${escapeHtml(row[columnIndex] || &#x27;&#x27;)}&lt;/td&gt;`).join(&#x27;&#x27;);
+      return `&lt;tr&gt;&lt;td class=&quot;sms-row-number&quot;&gt;${rowIndex + 1}&lt;/td&gt;${cells}&lt;/tr&gt;`;
+    }).join(&#x27;&#x27;);
+    grid.innerHTML = `&lt;colgroup&gt;&lt;col style=&quot;width:38px&quot;&gt;${columnDefinitions}&lt;/colgroup&gt;&lt;thead&gt;&lt;tr&gt;&lt;th class=&quot;sms-row-number&quot;&gt;#&lt;/th&gt;${columns}&lt;/tr&gt;&lt;/thead&gt;&lt;tbody&gt;${rows}&lt;/tbody&gt;`;
+    refreshColumnWidths();
+  }
+
+  function updateMessages() {
+    const activeRows = state.rows.filter(rowHasData);
+    const unsynced = state.messages.filter(message =&gt; !message.sync);
+    const synced = activeRows.map((row, index) =&gt; ({
+      id: `row-${index}`,
+      phone: getPhone(row),
+      text: renderTemplate(row),
+      sync: true
+    }));
+    state.messages = [...synced, ...unsynced.filter(message =&gt; !synced.some(item =&gt; item.id === message.id))];
+    renderMessages();
+  }
+
+  function renderMessages() {
+    messageList.innerHTML = state.messages.map((message, index) =&gt; `
+      &lt;article class=&quot;sms-message-item&quot; data-message-index=&quot;${index}&quot;&gt;
+        &lt;div class=&quot;sms-message-meta&quot;&gt;
+          &lt;span class=&quot;sms-phone-number&quot;&gt;${escapeHtml(message.phone || &#x27;未填写手机号&#x27;)}&lt;/span&gt;
+          &lt;label class=&quot;sms-sync-label&quot;&gt;&lt;input type=&quot;checkbox&quot; data-action=&quot;toggle-sync&quot; data-message-index=&quot;${index}&quot; ${message.sync ? &#x27;checked&#x27; : &#x27;&#x27;}&gt;与表同步&lt;/label&gt;
+        &lt;/div&gt;
+        &lt;textarea class=&quot;sms-message-editor&quot; aria-label=&quot;编辑发给 ${escapeHtml(message.phone || &#x27;未填写手机号&#x27;)} 的短信&quot; data-message-index=&quot;${index}&quot;&gt;${escapeHtml(message.text)}&lt;/textarea&gt;
+      &lt;/article&gt;`).join(&#x27;&#x27;);
+    const countText = `${state.messages.length} 条`;
+    root.querySelector(&#x27;[data-role=&quot;message-count&quot;]&#x27;).textContent = countText;
+    root.querySelector(&#x27;[data-role=&quot;footer-count&quot;]&#x27;).textContent = String(state.messages.length);
+  }
+
+  function showToast(message) {
+    toast.textContent = message;
+    toast.classList.add(&#x27;is-visible&#x27;);
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() =&gt; toast.classList.remove(&#x27;is-visible&#x27;), 1700);
+  }
+
+  function openImportDialog(source) {
+    state.pendingImport = source;
+    overwriteDialog.classList.add(&#x27;is-open&#x27;);
+    overwriteDialog.setAttribute(&#x27;aria-hidden&#x27;, &#x27;false&#x27;);
+  }
+
+  function closeImportDialog() {
+    overwriteDialog.classList.remove(&#x27;is-open&#x27;);
+    overwriteDialog.setAttribute(&#x27;aria-hidden&#x27;, &#x27;true&#x27;);
+    state.pendingImport = null;
+  }
+
+  function applyImport() {
+    if (state.pendingImport === &#x27;excel&#x27;) {
+      state.headers = [&#x27;名字&#x27;, &#x27;电话&#x27;, &#x27;服务到期日期&#x27;];
+      state.rows = [[&#x27;王五&#x27;, &#x27;13700137000&#x27;, &#x27;2026-11-20&#x27;], [&#x27;赵六&#x27;, &#x27;13600136000&#x27;, &#x27;2026-12-08&#x27;], [&#x27;&#x27;, &#x27;&#x27;, &#x27;&#x27;]];
+    } else {
+      state.headers = [&#x27;名字&#x27;, &#x27;电话&#x27;, &#x27;服务到期日期&#x27;];
+      state.rows = [[&#x27;钱七&#x27;, &#x27;13500135000&#x27;, &#x27;2027-01-18&#x27;], [&#x27;孙八&#x27;, &#x27;13400134000&#x27;, &#x27;2027-02-26&#x27;], [&#x27;&#x27;, &#x27;&#x27;, &#x27;&#x27;]];
+    }
+    renderGrid();
+    updateMessages();
+    closeImportDialog();
+    showToast(&#x27;已覆盖表格，同步短信已刷新&#x27;);
+  }
+
+  grid.addEventListener(&#x27;input&#x27;, event =&gt; {
+    const cell = event.target.closest(&#x27;[data-row-index]&#x27;);
+    if (cell) {
+      state.rows[Number(cell.dataset.rowIndex)][Number(cell.dataset.columnIndex)] = cell.textContent;
+      updateMessages();
+      refreshColumnWidths();
+      return;
+    }
+    const header = event.target.closest(&#x27;[data-header-index]&#x27;);
+    if (header) {
+      state.headers[Number(header.dataset.headerIndex)] = header.textContent.trim() || String(Number(header.dataset.headerIndex) + 1);
+      updateMessages();
+      refreshColumnWidths();
+    }
+  });
+
+  messageList.addEventListener(&#x27;input&#x27;, event =&gt; {
+    const editor = event.target.closest(&#x27;.sms-message-editor&#x27;);
+    if (!editor) return;
+    const index = Number(editor.dataset.messageIndex);
+    state.messages[index].text = editor.value;
+    state.messages[index].sync = false;
+    const checkbox = messageList.querySelector(`input[data-message-index=&quot;${index}&quot;]`);
+    if (checkbox) checkbox.checked = false;
+  });
+
+  messageList.addEventListener(&#x27;change&#x27;, event =&gt; {
+    const toggle = event.target.closest(&#x27;[data-action=&quot;toggle-sync&quot;]&#x27;);
+    if (!toggle) return;
+    const index = Number(toggle.dataset.messageIndex);
+    state.messages[index].sync = toggle.checked;
+    if (toggle.checked) updateMessages();
+  });
+
+  templateEditor.addEventListener(&#x27;input&#x27;, updateMessages);
+
+  root.addEventListener(&#x27;click&#x27;, event =&gt; {
+    const actionButton = event.target.closest(&#x27;[data-action]&#x27;);
+    if (!actionButton) return;
+    const action = actionButton.dataset.action;
+
+    if (action === &#x27;import-excel&#x27;) openImportDialog(&#x27;excel&#x27;);
+    if (action === &#x27;import-clipboard&#x27;) openImportDialog(&#x27;clipboard&#x27;);
+    if (action === &#x27;cancel-import&#x27;) closeImportDialog();
+    if (action === &#x27;confirm-import&#x27;) applyImport();
+
+    if (action === &#x27;add-row&#x27;) {
+      state.rows.push(state.headers.map(() =&gt; &#x27;&#x27;));
+      renderGrid();
+      showToast(&#x27;已添加一行&#x27;);
+    }
+    if (action === &#x27;add-column&#x27;) {
+      state.headers.push(String(state.headers.length + 1));
+      state.rows.forEach(row =&gt; row.push(&#x27;&#x27;));
+      renderGrid();
+      updateMessages();
+      showToast(&#x27;已添加一列&#x27;);
+    }
+    if (action === &#x27;delete-row&#x27; &amp;&amp; state.rows.length &gt; 1) {
+      state.rows.pop();
+      renderGrid();
+      updateMessages();
+      overflowMenu.classList.remove(&#x27;is-open&#x27;);
+    }
+    if (action === &#x27;delete-column&#x27; &amp;&amp; state.headers.length &gt; 1) {
+      state.headers.pop();
+      state.rows.forEach(row =&gt; row.pop());
+      renderGrid();
+      updateMessages();
+      overflowMenu.classList.remove(&#x27;is-open&#x27;);
+    }
+    if (action === &#x27;clear-table&#x27;) {
+      state.rows = Array.from({ length: 5 }, () =&gt; state.headers.map(() =&gt; &#x27;&#x27;));
+      renderGrid();
+      updateMessages();
+      overflowMenu.classList.remove(&#x27;is-open&#x27;);
+      showToast(&#x27;表格已清空&#x27;);
+    }
+    if (action === &#x27;toggle-overflow&#x27;) overflowMenu.classList.toggle(&#x27;is-open&#x27;);
+
+    if (action === &#x27;sync-all&#x27;) {
+      state.messages.forEach(message =&gt; { message.sync = true; });
+      updateMessages();
+      showToast(&#x27;所有短信已恢复与表同步&#x27;);
+    }
+    if (action === &#x27;unsync-all&#x27;) {
+      state.messages.forEach(message =&gt; { message.sync = false; });
+      renderMessages();
+      showToast(&#x27;所有短信已取消同步&#x27;);
+    }
+    if (action === &#x27;overwrite-template&#x27;) showToast(&#x27;已覆盖保存当前模板&#x27;);
+    if (action === &#x27;save-template-as&#x27;) showToast(&#x27;已另存为“服务到期提醒（副本）”&#x27;);
+    if (action === &#x27;send&#x27;) showToast(&#x27;这里将进入最终发送确认&#x27;);
+
+    if (action === &#x27;open-manager&#x27;) {
+      managerEditor.value = templateEditor.value;
+      manager.classList.add(&#x27;is-open&#x27;);
+    }
+    if (action === &#x27;close-manager&#x27;) manager.classList.remove(&#x27;is-open&#x27;);
+    if (action === &#x27;manager-overwrite&#x27;) {
+      templateEditor.value = managerEditor.value;
+      updateMessages();
+      showToast(&#x27;模板已覆盖保存&#x27;);
+    }
+    if (action === &#x27;manager-save-as&#x27;) showToast(&#x27;新模板已保存&#x27;);
+    if (action === &#x27;delete-template&#x27;) showToast(&#x27;默认模板不能删除&#x27;);
+  });
+
+  renderGrid();
+  updateMessages();
+  if (&#x27;ResizeObserver&#x27; in window) {
+    new ResizeObserver(refreshColumnWidths).observe(root.querySelector(&#x27;.sms-table-wrap&#x27;));
+  }
+})();
+&lt;/script&gt;
+
+&lt;script src=&quot;https://unpkg.com/@floating-ui/core@1.7.3/dist/floating-ui.core.umd.min.js&quot;&gt;&lt;/script&gt;
+&lt;script src=&quot;https://unpkg.com/@floating-ui/dom@1.7.4/dist/floating-ui.dom.umd.min.js&quot;&gt;&lt;/script&gt;
+&lt;script&gt;
+(() =&gt; {
+  if (window.FloatingUIDOM == null) {
+    return;
+  }
+  const { autoUpdate, computePosition, flip, offset, shift, size } =
+    window.FloatingUIDOM;
+  const tooltipPlacements = new Set([&quot;top&quot;, &quot;right&quot;, &quot;bottom&quot;, &quot;left&quot;]);
+  const tooltipId = `codex-visualization-tooltip-${
+    window.crypto?.randomUUID?.() ?? Date.now().toString(36)
+  }`;
+  const tooltipGap = 5;
+  const hoverDelay = 700;
+  const skipDelay = 300;
+  let activeTrigger = null;
+  let pendingTrigger = null;
+  let tooltip = null;
+  let openTimeout = null;
+  let autoUpdateCleanup = null;
+  let positionRequest = 0;
+  let skipDelayUntil = 0;
+
+  const getTrigger = (target) =&gt;
+    target?.nodeType === Node.ELEMENT_NODE
+      ? target.closest(&quot;[data-tooltip]&quot;)
+      : null;
+  const containsTarget = (trigger, target) =&gt;
+    target?.nodeType != null &amp;&amp; trigger.contains(target);
+  const getContent = (trigger) =&gt;
+    trigger.getAttribute(&quot;data-tooltip&quot;)?.trim() ?? &quot;&quot;;
+  const getPlacement = (trigger) =&gt; {
+    const placement = trigger.getAttribute(&quot;data-tooltip-placement&quot;);
+    return tooltipPlacements.has(placement) ? placement : &quot;top&quot;;
+  };
+  const getTooltip = () =&gt; {
+    if (tooltip == null) {
+      tooltip = document.createElement(&quot;div&quot;);
+      tooltip.id = tooltipId;
+      tooltip.className = &quot;tooltip&quot;;
+      tooltip.setAttribute(&quot;role&quot;, &quot;tooltip&quot;);
+    }
+    return tooltip;
+  };
+  const setDescribedBy = (trigger, described) =&gt; {
+    const ids = new Set(
+      (trigger.getAttribute(&quot;aria-describedby&quot;) ?? &quot;&quot;)
+        .split(/\s+/)
+        .filter(Boolean),
+    );
+    if (described) {
+      ids.add(tooltipId);
+    } else {
+      ids.delete(tooltipId);
+    }
+    if (ids.size === 0) {
+      trigger.removeAttribute(&quot;aria-describedby&quot;);
+    } else {
+      trigger.setAttribute(&quot;aria-describedby&quot;, [...ids].join(&quot; &quot;));
+    }
+  };
+  const clearOpenTimeout = () =&gt; {
+    if (openTimeout != null) {
+      window.clearTimeout(openTimeout);
+      openTimeout = null;
+    }
+    pendingTrigger = null;
+  };
+  const closeTooltip = (activateSkipDelay = true) =&gt; {
+    clearOpenTimeout();
+    positionRequest += 1;
+    autoUpdateCleanup?.();
+    autoUpdateCleanup = null;
+    if (activeTrigger == null) {
+      return;
+    }
+    setDescribedBy(activeTrigger, false);
+    activeTrigger = null;
+    tooltip?.remove();
+    if (activateSkipDelay) {
+      skipDelayUntil = Date.now() + skipDelay;
+    }
+  };
+  const updatePosition = (trigger, floating) =&gt; {
+    const request = ++positionRequest;
+    void computePosition(trigger, floating, {
+      middleware: [
+        offset(tooltipGap),
+        flip({ padding: tooltipGap }),
+        shift({ padding: tooltipGap }),
+        size({
+          padding: tooltipGap,
+          apply({ availableHeight, availableWidth, elements }) {
+            elements.floating.style.setProperty(
+              &quot;--tooltip-available-width&quot;,
+              `${Math.max(0, availableWidth)}px`,
+            );
+            elements.floating.style.setProperty(
+              &quot;--tooltip-available-height&quot;,
+              `${Math.max(0, availableHeight)}px`,
+            );
+          },
+        }),
+      ],
+      placement: getPlacement(trigger),
+      strategy: &quot;fixed&quot;,
+    })
+      .then(({ x, y }) =&gt; {
+        if (activeTrigger !== trigger || request !== positionRequest) {
+          return;
+        }
+        const scale = window.devicePixelRatio || 1;
+        floating.style.transform = `translate(${Math.round(x * scale) / scale}px, ${Math.round(y * scale) / scale}px)`;
+        floating.style.visibility = &quot;visible&quot;;
+      })
+      .catch(() =&gt; {
+        if (activeTrigger === trigger &amp;&amp; request === positionRequest) {
+          closeTooltip(false);
+        }
+      });
+  };
+  const openTooltip = (trigger) =&gt; {
+    const content = getContent(trigger);
+    if (!trigger.isConnected || content.length === 0) {
+      return;
+    }
+    clearOpenTimeout();
+    if (activeTrigger === trigger) {
+      return;
+    }
+    closeTooltip();
+    const floating = getTooltip();
+    floating.textContent = content;
+    floating.style.visibility = &quot;hidden&quot;;
+    floating.style.transform = &quot;translate(0, 0)&quot;;
+    document.body.appendChild(floating);
+    activeTrigger = trigger;
+    setDescribedBy(trigger, true);
+    autoUpdateCleanup = autoUpdate(trigger, floating, () =&gt; {
+      updatePosition(trigger, floating);
+    });
+  };
+  const requestOpen = (trigger, immediate = false) =&gt; {
+    if (
+      getContent(trigger).length === 0 ||
+      activeTrigger === trigger ||
+      pendingTrigger === trigger
+    ) {
+      return;
+    }
+    clearOpenTimeout();
+    pendingTrigger = trigger;
+    const delay =
+      immediate || activeTrigger != null || Date.now() &lt; skipDelayUntil
+        ? 0
+        : hoverDelay;
+    if (delay === 0) {
+      openTooltip(trigger);
+      return;
+    }
+    openTimeout = window.setTimeout(() =&gt; {
+      openTimeout = null;
+      pendingTrigger = null;
+      openTooltip(trigger);
+    }, delay);
+  };
+  const handlePointerOpen = (event) =&gt; {
+    if (event.pointerType === &quot;touch&quot;) {
+      return;
+    }
+    const trigger = getTrigger(event.target);
+    if (trigger == null || containsTarget(trigger, event.relatedTarget)) {
+      return;
+    }
+    requestOpen(trigger);
+  };
+  const handleLeave = (event) =&gt; {
+    const trigger = getTrigger(event.target);
+    if (trigger == null || containsTarget(trigger, event.relatedTarget)) {
+      return;
+    }
+    if (activeTrigger === trigger || pendingTrigger === trigger) {
+      closeTooltip();
+    }
+  };
+  const handleFocusIn = (event) =&gt; {
+    const trigger = getTrigger(event.target);
+    if (trigger?.matches(&quot;:focus-visible&quot;)) {
+      requestOpen(trigger, true);
+    }
+  };
+  const handleKeyDown = (event) =&gt; {
+    if (event.key === &quot;Escape&quot;) {
+      closeTooltip();
+    }
+  };
+  const handleContextMenu = (event) =&gt; {
+    const trigger = getTrigger(event.target);
+    if (activeTrigger === trigger || pendingTrigger === trigger) {
+      closeTooltip();
+    }
+  };
+  const destroy = () =&gt; {
+    closeTooltip(false);
+    document.removeEventListener(&quot;pointerover&quot;, handlePointerOpen);
+    document.removeEventListener(&quot;pointerout&quot;, handleLeave);
+    document.removeEventListener(&quot;focusin&quot;, handleFocusIn);
+    document.removeEventListener(&quot;focusout&quot;, handleLeave);
+    document.removeEventListener(&quot;keydown&quot;, handleKeyDown);
+    document.removeEventListener(&quot;contextmenu&quot;, handleContextMenu);
+    tooltip = null;
+  };
+
+  document.addEventListener(&quot;pointerover&quot;, handlePointerOpen);
+  document.addEventListener(&quot;pointerout&quot;, handleLeave);
+  document.addEventListener(&quot;focusin&quot;, handleFocusIn);
+  document.addEventListener(&quot;focusout&quot;, handleLeave);
+  document.addEventListener(&quot;keydown&quot;, handleKeyDown);
+  document.addEventListener(&quot;contextmenu&quot;, handleContextMenu);
+  window.addEventListener(&quot;pagehide&quot;, destroy, { once: true });
+})();
+&lt;/script&gt;
+&lt;script id=&quot;codex-visualization-lucide&quot; async src=&quot;https://unpkg.com/lucide@1.17.0/dist/umd/lucide.js&quot;&gt;&lt;/script&gt;
+&lt;script&gt;
+(() =&gt; {
+  const initialize = () =&gt; {
+    globalThis.lucide?.createIcons({ attrs: { width: 16, height: 16 } });
+  };
+  if (globalThis.lucide != null) {
+    initialize();
+    return;
+  }
+  document
+    .getElementById(&quot;codex-visualization-lucide&quot;)
+    ?.addEventListener(&quot;load&quot;, initialize, { once: true });
+})();
+&lt;/script&gt;
+
+&lt;/body&gt;
+&lt;/html&gt;
+"></iframe>
+</body>
+</html>
