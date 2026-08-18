@@ -21,6 +21,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -56,10 +57,12 @@ fun EditableTable(
     val horizontalScroll = rememberScrollState()
     val borderColor = MaterialTheme.colorScheme.outlineVariant
     val headerColor = MaterialTheme.colorScheme.surfaceVariant
-    val columnWidths = table.columns.mapIndexed { index, column ->
-        contentAwareColumnWidth(
-            listOf(column.name) + table.rows.map { it.cells.getOrNull(index).orEmpty() },
-        )
+    val columnWidths = remember(table) {
+        table.columns.mapIndexed { index, column ->
+            contentAwareColumnWidth(
+                listOf(column.name) + table.rows.map { it.cells.getOrNull(index).orEmpty() },
+            )
+        }
     }
     val columnsWidth = columnWidths.fold(0.dp) { total, width -> total + width }
     val contentWidth = 36.dp + columnsWidth + 40.dp
