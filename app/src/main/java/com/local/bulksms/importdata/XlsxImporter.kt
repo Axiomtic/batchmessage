@@ -4,11 +4,7 @@ import com.local.bulksms.model.RawTable
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.GregorianCalendar
 import java.util.Locale
-import java.util.TimeZone
 import java.util.zip.ZipInputStream
 import javax.xml.parsers.DocumentBuilderFactory
 import org.w3c.dom.Document
@@ -253,34 +249,13 @@ class XlsxImporter : TableImporter {
         }
         val style = cell.attribute("s").toIntOrNull()?.let(dateStyles::get)
         if (style != null && trimmedValue.isNotBlank() && (type.isBlank() || type == "n" || formula)) {
-            formatExcelDate(trimmedValue, style.hasTime, date1904)?.let { return it }
+            ExcelDateFormat.format(trimmedValue, style.hasTime, date1904)?.let { return it }
         }
         return if (type.isBlank() || type == "n" || formula) trimmedValue else rawValue
     }
 
     private fun richTextValue(element: Element): String =
         descendantElements(element, "t").joinToString(separator = "") { it.textContent }
-
-    private fun formatExcelDate(serialText: String, hasTime: Boolean, date1904: Boolean): String? {
-        val serial = serialText.toDoubleOrNull() ?: return null
-        if (!serial.isFinite()) return null
-        return try {
-            var milliseconds = Math.round(serial * MILLIS_PER_DAY)
-            if (!date1904 && serial >= 60.0) milliseconds -= MILLIS_PER_DAY
-            val epoch = if (date1904) EXCEL_1904_EPOCH_MILLIS else EXCEL_EPOCH_MILLIS
-            val date = Date(epoch + milliseconds)
-            if (!hasTime) {
-                dateFormat("yyyy-MM-dd").format(date)
-            } else {
-                val full = dateFormat("yyyy-MM-dd HH:mm:ss.SSS").format(date)
-                if (full.endsWith(".000")) full.removeSuffix(".000") else full
-            }
-        } catch (_: ArithmeticException) {
-            null
-        } catch (_: RuntimeException) {
-            null
-        }
-    }
 
     private fun parseXml(bytes: ByteArray, description: String): Document {
         try {
@@ -337,11 +312,6 @@ class XlsxImporter : TableImporter {
         return getAttributeNS(RELATIONSHIPS_NS, name.substringAfter(':')).orEmpty()
     }
 
-    private fun dateFormat(pattern: String): SimpleDateFormat =
-        SimpleDateFormat(pattern, Locale.US).apply {
-            timeZone = TimeZone.getTimeZone("UTC")
-        }
-
     private fun columnIndex(reference: String): Int? {
         if (reference.isBlank()) return null
         val letters = reference.trim('$').takeWhile { it in 'A'..'Z' || it in 'a'..'z' }
@@ -356,44 +326,11 @@ class XlsxImporter : TableImporter {
         return (index - 1).toInt()
     }
 
-    private fun isDateFormat(formatCode: String): Boolean {
-        val stripped = formatCode
-            .replace(Regex("\\\"[^\\\"]*\\\""), "")
-            .replace(Regex("\\\\."), "")
-            .lowercase(Locale.US)
-        return stripped.any { it == 'y' || it == 'd' || it == 'h' || it == 's' } ||
-            (stripped.contains('m') && !stripped.matches(Regex(".*[0#?].*")))
-    }
+    private fun isDateFormat(formatCode: String): Boolean = ExcelDateFormat.isDateFormat(formatCode)
 
-    private fun hasTimePart(formatCode: String): Boolean {
-        val stripped = formatCode.lowercase(Locale.US)
-        return stripped.contains('h') || stripped.contains('s') || stripped.contains("am/pm")
-    }
+    private fun hasTimePart(formatCode: String): Boolean = ExcelDateFormat.hasTimePart(formatCode)
 
-    private fun builtInDateFormat(numFmtId: Int): String? = when (numFmtId) {
-        14 -> "yyyy-mm-dd"
-        15 -> "d-mmm-yy"
-        16 -> "d-mmm"
-        17 -> "mmm-yy"
-        18 -> "h:mm AM/PM"
-        19 -> "h:mm:ss AM/PM"
-        20 -> "h:mm"
-        21 -> "h:mm:ss"
-        22 -> "m/d/yy h:mm"
-        27, 28, 29 -> "yyyy-mm-dd"
-        30 -> "m-d-yy"
-        31 -> "yyyy-mm-dd"
-        32 -> "h:mm"
-        33 -> "h:mm:ss"
-        34 -> "h:mm"
-        35 -> "h:mm:ss"
-        36 -> "yyyy-mm"
-        45 -> "mm:ss"
-        46 -> "[h]:mm:ss"
-        47 -> "mmss.0"
-        50, 51, 52, 53, 54, 55, 56, 57, 58 -> "yyyy-mm-dd"
-        else -> null
-    }
+    private fun builtInDateFormat(numFmtId: Int): String? = ExcelDateFormat.builtInDateFormat(numFmtId)
 
     private data class WorkbookSheet(
         val relationshipId: String,
@@ -424,7 +361,6 @@ class XlsxImporter : TableImporter {
         const val MAX_COLUMN_COUNT = 16_384
         const val MAX_RAW_ROWS = HeaderDetector.MAX_DATA_ROWS + 1
         const val BUFFER_SIZE = 8 * 1024
-        const val MILLIS_PER_DAY = 86_400_000L
         const val WORKSHEET_RELATIONSHIP_TYPE =
             "http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet"
         const val STRICT_WORKSHEET_RELATIONSHIP_TYPE =
@@ -443,13 +379,5 @@ class XlsxImporter : TableImporter {
         const val LOAD_EXTERNAL_DTD_FEATURE = "http://apache.org/xml/features/nonvalidating/load-external-dtd"
         const val ACCESS_EXTERNAL_DTD_PROPERTY = "http://javax.xml.XMLConstants/property/accessExternalDTD"
         const val ACCESS_EXTERNAL_SCHEMA_PROPERTY = "http://javax.xml.XMLConstants/property/accessExternalSchema"
-        val EXCEL_EPOCH_MILLIS = GregorianCalendar(TimeZone.getTimeZone("UTC")).apply {
-            clear()
-            set(1899, GregorianCalendar.DECEMBER, 31, 0, 0, 0)
-        }.timeInMillis
-        val EXCEL_1904_EPOCH_MILLIS = GregorianCalendar(TimeZone.getTimeZone("UTC")).apply {
-            clear()
-            set(1904, GregorianCalendar.JANUARY, 1, 0, 0, 0)
-        }.timeInMillis
     }
 }
