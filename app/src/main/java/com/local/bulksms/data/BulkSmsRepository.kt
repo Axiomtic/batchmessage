@@ -1,6 +1,7 @@
 package com.local.bulksms.data
 
 import androidx.room.withTransaction
+import com.local.bulksms.importdata.PhoneNumberChecker
 import com.local.bulksms.model.MessageDraft
 import com.local.bulksms.model.SendAttemptResult
 import com.local.bulksms.model.SendStatus
@@ -76,9 +77,9 @@ class BulkSmsRepository(
      * Atomically snapshots the current draft phone/body values into a new queue.
      * Subsequent draft edits cannot change these send items.
      *
-     * Each draft expands into up to two items: one for the primary phone column and
-     * one for the backup phone column. Empty numbers are skipped, so a row with only
-     * one valid number produces exactly one message.
+     * Each draft expands into one item per valid mobile number found in its primary
+     * and backup phone columns. A cell such as "18912128125（旧） 18912128115（新）"
+     * therefore yields two messages; rows with no valid number are skipped.
      */
     suspend fun freezeQueue(
         importId: String,
@@ -103,22 +104,15 @@ class BulkSmsRepository(
             var ordinal = 0
             val items = mutableListOf<SendItemEntity>()
             for (draft in drafts) {
-                if (draft.phoneNumber.isNotBlank()) {
+                val numbers = linkedSetOf<String>()
+                numbers += PhoneNumberChecker.extractMobileNumbers(draft.phoneNumber)
+                numbers += PhoneNumberChecker.extractMobileNumbers(draft.backupPhoneNumber)
+                for (number in numbers) {
                     items += SendItemEntity(
                         id = idFactory(),
                         taskId = taskId,
                         ordinal = ordinal++,
-                        phoneNumber = draft.phoneNumber,
-                        body = draft.currentBody,
-                        status = SendStatus.PENDING,
-                    )
-                }
-                if (draft.backupPhoneNumber.isNotBlank()) {
-                    items += SendItemEntity(
-                        id = idFactory(),
-                        taskId = taskId,
-                        ordinal = ordinal++,
-                        phoneNumber = draft.backupPhoneNumber,
+                        phoneNumber = number,
                         body = draft.currentBody,
                         status = SendStatus.PENDING,
                     )

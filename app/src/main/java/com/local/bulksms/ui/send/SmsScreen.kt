@@ -45,6 +45,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.local.bulksms.importdata.PhoneNumberChecker
 import com.local.bulksms.ui.BulkSmsCallbacks
 import com.local.bulksms.ui.components.RoundedActionIcon
 import com.local.bulksms.ui.components.RoundedActionKind
@@ -74,8 +75,8 @@ fun SmsScreen(
     val pendingMessageCount = state.drafts
         .filter { it.rowId in state.selectedDraftRowIds }
         .sumOf { draft ->
-            (if (draft.phoneNumber.isNotBlank()) 1 else 0) +
-                (if (draft.backupPhoneNumber.isNotBlank()) 1 else 0)
+            PhoneNumberChecker.extractMobileNumbers(draft.phoneNumber).size +
+                PhoneNumberChecker.extractMobileNumbers(draft.backupPhoneNumber).size
         }
 
     Column(

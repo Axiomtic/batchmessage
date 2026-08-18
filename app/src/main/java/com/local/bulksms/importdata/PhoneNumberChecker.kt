@@ -20,6 +20,9 @@ enum class Carrier { CHINA_MOBILE, CHINA_UNICOM, CHINA_TELECOM, CHINA_BROADNET, 
 object PhoneNumberChecker {
     private val MOBILE_PATTERN = Regex("^1[3-9]\\d{9}$")
 
+    /** Matches an 11-digit mainland mobile number that is not part of a longer digit run. */
+    private val MOBILE_EXTRACT_PATTERN = Regex("(?<!\\d)1[3-9]\\d{9}(?!\\d)")
+
     private val CHINA_MOBILE_PREFIXES = setOf(
         "134", "135", "136", "137", "138", "139", "147", "148", "150", "151", "152",
         "157", "158", "159", "165", "172", "173", "174", "178", "182", "183", "184",
@@ -35,12 +38,27 @@ object PhoneNumberChecker {
     private val CHINA_BROADNET_PREFIXES = setOf("192")
 
     fun availability(value: String): PhoneAvailability {
+        if (extractMobileNumbers(value).isNotEmpty()) return PhoneAvailability.AVAILABLE
         val normalized = normalize(value)
         return when {
             normalized.isEmpty() -> PhoneAvailability.EMPTY
             normalized.matches(MOBILE_PATTERN) -> PhoneAvailability.AVAILABLE
             else -> PhoneAvailability.INVALID
         }
+    }
+
+    /**
+     * Extracts every valid mainland mobile number from free-form text such as
+     * "18912128125（旧） 18912128115（新）". Numbers are de-duplicated and keep their
+     * first-seen order.
+     */
+    fun extractMobileNumbers(value: String): List<String> {
+        val result = linkedSetOf<String>()
+        for (match in MOBILE_EXTRACT_PATTERN.findAll(value)) {
+            val digits = match.value
+            if (carrierOf(digits) != Carrier.UNKNOWN) result += digits
+        }
+        return result.toList()
     }
 
     fun carrierOf(value: String): Carrier {

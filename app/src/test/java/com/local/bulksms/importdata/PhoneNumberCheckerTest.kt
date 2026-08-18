@@ -45,4 +45,33 @@ class PhoneNumberCheckerTest {
         assertEquals(true, PhoneNumberChecker.isBlank("  -  "))
         assertEquals(false, PhoneNumberChecker.isBlank("13800138000"))
     }
+
+    @Test
+    fun extractsMultipleNumbersFromFreeFormText() {
+        assertEquals(
+            listOf("18912128125", "18912128115"),
+            PhoneNumberChecker.extractMobileNumbers("18912128125（旧） 18912128115（新）"),
+        )
+    }
+
+    @Test
+    fun extractionDeduplicatesAndSkipsNonMobileDigits() {
+        assertEquals(
+            listOf("13800138000"),
+            PhoneNumberChecker.extractMobileNumbers("13800138000 / 13800138000 / 张三 / 12345"),
+        )
+        // A 12-digit run must not yield an 11-digit prefix.
+        assertEquals(
+            emptyList<String>(),
+            PhoneNumberChecker.extractMobileNumbers("189121281251"),
+        )
+    }
+
+    @Test
+    fun availabilityTreatsEmbeddedNumbersAsAvailable() {
+        assertEquals(
+            PhoneAvailability.AVAILABLE,
+            PhoneNumberChecker.availability("18912128125（旧） 18912128115（新）"),
+        )
+    }
 }

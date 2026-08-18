@@ -6,6 +6,7 @@ object PhoneColumnDetector {
     private val normalizedPhonePattern = Regex("\\+?[0-9]{7,15}")
 
     fun isValid(value: String): Boolean {
+        if (PhoneNumberChecker.extractMobileNumbers(value).isNotEmpty()) return true
         return normalize(value).matches(normalizedPhonePattern)
     }
 

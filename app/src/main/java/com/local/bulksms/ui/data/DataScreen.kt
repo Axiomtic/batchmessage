@@ -32,7 +32,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.local.bulksms.importdata.PhoneAvailability
 import com.local.bulksms.importdata.PhoneNumberChecker
 import com.local.bulksms.model.ImportedTable
 import com.local.bulksms.ui.BulkSmsCallbacks
@@ -219,10 +218,12 @@ private fun phoneStats(table: ImportedTable): PhoneStats {
     var empty = 0
     for (row in table.rows) {
         for (index in indexes) {
-            when (PhoneNumberChecker.availability(row.cells.getOrNull(index).orEmpty())) {
-                PhoneAvailability.AVAILABLE -> available++
-                PhoneAvailability.INVALID -> invalid++
-                PhoneAvailability.EMPTY -> empty++
+            val cell = row.cells.getOrNull(index).orEmpty()
+            val numbers = PhoneNumberChecker.extractMobileNumbers(cell)
+            when {
+                numbers.isNotEmpty() -> available += numbers.size
+                cell.isBlank() -> empty++
+                else -> invalid++
             }
         }
     }
