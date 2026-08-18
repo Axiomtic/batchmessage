@@ -2,13 +2,16 @@ package com.local.bulksms.importdata
 
 import com.local.bulksms.model.RawTable
 import java.io.BufferedInputStream
+import java.io.ByteArrayInputStream
 import java.io.InputStream
 
 /**
- * Unified Excel entry point. Detects the container format from the leading magic
- * bytes and dispatches to the OOXML ([XlsxImporter]) or BIFF8 ([XlsImporter])
- * reader, so .xls files (and .xls content carrying a .xlsx name) import correctly
- * instead of failing with "无法解析 xl/workbook.xml".
+ * Unified Excel entry point.
+ *
+ * Apache POI ([PoiExcelImporter]) is tried first because it is the reference
+ * implementation for the many real-world .xls/.xlsx variants. If POI rejects the
+ * container, the self-hosted readers ([XlsxImporter] / [XlsImporter]) are used as a
+ * fallback so documents with a stray DOCTYPE or other minor anomalies still import.
  */
 object ExcelImporter : TableImporter {
     private val ZIP_MAGIC = byteArrayOf(0x50, 0x4B, 0x03, 0x04) // "PK\x03\x04"
@@ -19,6 +22,24 @@ object ExcelImporter : TableImporter {
 
     override fun import(input: InputStream): RawTable {
         val buffered = if (input is BufferedInputStream) input else BufferedInputStream(input)
+        val bytes = buffered.readBytes()
+
+        val poiError = try {
+            return PoiExcelImporter().import(ByteArrayInputStream(bytes))
+        } catch (exception: Exception) {
+            exception
+        }
+
+        // Fall back to the self-hosted readers for containers POI does not accept.
+        try {
+            return selfHostedImport(ByteArrayInputStream(bytes))
+        } catch (_: Exception) {
+            throw poiError
+        }
+    }
+
+    private fun selfHostedImport(input: InputStream): RawTable {
+        val buffered = BufferedInputStream(input)
         buffered.mark(8)
         val magic = ByteArray(8)
         val read = buffered.read(magic)

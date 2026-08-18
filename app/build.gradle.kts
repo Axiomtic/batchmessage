@@ -46,6 +46,8 @@ dependencies {
     ksp("androidx.room:room-compiler:2.8.4")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
     implementation(platform("org.jetbrains.kotlinx:kotlinx-serialization-bom:1.8.1"))
+    implementation("org.apache.poi:poi:5.2.5")
+    implementation("org.apache.poi:poi-ooxml:5.2.5")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
     androidTestImplementation(platform("androidx.compose:compose-bom:2026.02.01"))

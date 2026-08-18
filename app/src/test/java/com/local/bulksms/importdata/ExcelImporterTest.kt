@@ -65,7 +65,7 @@ class ExcelImporterTest {
         val failure = assertThrows(IllegalArgumentException::class.java) {
             ExcelImporter.import("plain text, not an excel file".byteInputStream())
         }
-        assertTrue(failure.message.orEmpty().contains("无法识别"))
+        assertTrue(failure.message.orEmpty().contains("Excel"))
     }
 
     private fun xlsxFixture(rows: List<List<String>>): ByteArray {
