@@ -170,8 +170,9 @@ fun EditableTable(
 }
 
 /**
- * Header colors signal the phone-column role: both roles use the app's teal-green
- * theme colors, the primary role with a solid fill and the backup with a light one.
+ * Header colors signal the phone-column role: both roles use a green family so they
+ * read as phone columns; the primary role gets the app's teal-green primary fill and
+ * the backup a clearly light-green fill (not a cyan/teal tint).
  */
 @Composable
 private fun columnHeaderColors(
@@ -180,10 +181,14 @@ private fun columnHeaderColors(
     backupPhoneColumnIndex: Int?,
 ): Pair<Color, Color> = when (index) {
     phoneColumnIndex -> MaterialTheme.colorScheme.primary to MaterialTheme.colorScheme.onPrimary
-    backupPhoneColumnIndex -> {
-        MaterialTheme.colorScheme.primaryContainer to MaterialTheme.colorScheme.onPrimaryContainer
-    }
+    backupPhoneColumnIndex -> PhoneColumnPalette.BackupHeader to PhoneColumnPalette.OnBackupHeader
     else -> MaterialTheme.colorScheme.surfaceVariant to MaterialTheme.colorScheme.onSurface
+}
+
+/** Light-green backup header colors, distinct from the teal-cyan primary. */
+private object PhoneColumnPalette {
+    val BackupHeader = Color(0xFFC8E6C9)
+    val OnBackupHeader = Color(0xFF1B5E20)
 }
 
 @Composable
