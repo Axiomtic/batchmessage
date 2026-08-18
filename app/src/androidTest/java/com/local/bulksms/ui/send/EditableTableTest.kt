@@ -107,6 +107,7 @@ class EditableTableTest {
             }
         }
 
+        composeRule.onNodeWithTag("cell-7-1").performClick()
         composeRule.onNodeWithTag("cell-7-1").performTextReplacement("张三丰")
         composeRule.onNodeWithTag("column-label-B").assertExists()
 
