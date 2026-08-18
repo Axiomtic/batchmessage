@@ -10,10 +10,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -32,6 +34,7 @@ import com.local.bulksms.sms.parseSendIntervalMillis
 import com.local.bulksms.ui.BulkSmsCallbacks
 import com.local.bulksms.ui.icons.BulkSmsIcons
 import com.local.bulksms.ui.send.SendFlowUiState
+import com.local.bulksms.ui.send.SimDetectionState
 import com.local.bulksms.ui.theme.neutralOutlinedTextFieldColors
 
 @Composable
@@ -69,11 +72,81 @@ fun SettingsScreen(
             }
         }
         item {
+            SettingsGroup(title = "SIM 卡权限", iconRes = BulkSmsIcons.Sim) {
+                SimPermissionContent(state = state, callbacks = callbacks)
+            }
+        }
+    }
+}
+
+@Composable
+private fun SimPermissionContent(
+    state: SendFlowUiState,
+    callbacks: BulkSmsCallbacks,
+) {
+    when (state.simDetectionState) {
+        SimDetectionState.PERMISSION_REQUIRED -> {
             Text(
-                "SIM 卡选择、电话号码列和首行字段设置请前往数据或发送页面。",
+                "需要电话权限才能读取 SIM 卡",
+                modifier = Modifier.padding(top = 10.dp),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            TextButton(
+                onClick = callbacks.onRequestSimPermission,
+                modifier = Modifier.testTag("grant-sim-permission"),
+            ) { Text("授权读取 SIM") }
+        }
+        SimDetectionState.LOADING -> Row(
+            modifier = Modifier.padding(vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            CircularProgressIndicator()
+            Text("正在检测 SIM")
+        }
+        SimDetectionState.EMPTY -> {
+            Text(
+                "没有检测到活动 SIM",
+                modifier = Modifier.padding(top = 10.dp),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            TextButton(
+                onClick = callbacks.onRefreshSimOptions,
+                modifier = Modifier.testTag("refresh-sim"),
+            ) { Text("重新检测") }
+        }
+        SimDetectionState.ERROR -> {
+            Text(
+                state.simDetectionError ?: "SIM 检测失败",
+                modifier = Modifier.padding(top = 10.dp),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+            TextButton(
+                onClick = callbacks.onRefreshSimOptions,
+                modifier = Modifier.testTag("retry-sim"),
+            ) { Text("重试") }
+        }
+        SimDetectionState.AVAILABLE -> {
+            Text(
+                "已授权，可在发送页面选择发送 SIM。",
+                modifier = Modifier.padding(top = 10.dp),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            state.simOptions.forEach { sim ->
+                Text(
+                    "• ${sim.displayLabel}",
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
+            TextButton(
+                onClick = callbacks.onRefreshSimOptions,
+                modifier = Modifier.testTag("refresh-sim"),
+            ) { Text("重新检测") }
         }
     }
 }

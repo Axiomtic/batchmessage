@@ -61,28 +61,21 @@ class DataScreenTest {
     }
 
     @Test
-    fun clickingColumnHeaderOpensColumnRoleMenu() {
-        var primarySelected: Int? = null
-        var backupSelected: Int? = null
+    fun clickingColumnHeaderCyclesPhoneRoles() {
+        var clicked: Int? = null
         val state = SendFlowViewModel().state.value
         composeRule.setContent {
             MaterialTheme {
                 DataScreen(
                     state = state,
                     callbacks = BulkSmsCallbacks(
-                        onPhoneColumnSelected = { primarySelected = it },
-                        onBackupPhoneColumnSelected = { backupSelected = it },
+                        onColumnHeaderClicked = { clicked = it },
                     ),
                 )
             }
         }
 
         composeRule.onNodeWithTag("column-label-服务到期日期").performClick()
-        composeRule.onNodeWithText("设为主电话号码列").performClick()
-        composeRule.runOnIdle { assertEquals(2, primarySelected) }
-
-        composeRule.onNodeWithTag("column-label-服务到期日期").performClick()
-        composeRule.onNodeWithText("设为备用电话号码列").performClick()
-        composeRule.runOnIdle { assertEquals(2, backupSelected) }
+        composeRule.runOnIdle { assertEquals(2, clicked) }
     }
 }

@@ -154,6 +154,7 @@ class MainActivity : ComponentActivity() {
                         onCellChanged = sendFlowViewModel::editCell,
                         onPhoneColumnSelected = sendFlowViewModel::selectPhoneColumn,
                         onBackupPhoneColumnSelected = sendFlowViewModel::selectBackupPhoneColumn,
+                        onColumnHeaderClicked = sendFlowViewModel::onColumnHeaderClicked,
                         onAddRow = sendFlowViewModel::addRow,
                         onAddColumn = sendFlowViewModel::addColumn,
                         onDeleteRow = sendFlowViewModel::deleteRow,

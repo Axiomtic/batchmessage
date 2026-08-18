@@ -275,4 +275,42 @@ class SendFlowViewModelTest {
         val draft = viewModel.state.value.drafts.single()
         assertEquals("张三，您的服务到期日是2027-01-01", draft.currentBody)
     }
+
+    @Test
+    fun columnHeaderClickCyclesPrimaryBackupAndClear() {
+        val viewModel = SendFlowViewModel()
+        viewModel.importClipboard("手机号\t备用手机号\t姓名\n13800138000\t13900139000\t张三")
+        viewModel.selectTemplate("template-1", "{姓名}您好")
+
+        viewModel.onColumnHeaderClicked(0) // primary
+        assertEquals(0, viewModel.state.value.selectedPhoneColumn)
+        assertNull(viewModel.state.value.selectedBackupPhoneColumn)
+
+        viewModel.onColumnHeaderClicked(1) // backup
+        assertEquals(0, viewModel.state.value.selectedPhoneColumn)
+        assertEquals(1, viewModel.state.value.selectedBackupPhoneColumn)
+
+        viewModel.onColumnHeaderClicked(0) // clear primary
+        assertNull(viewModel.state.value.selectedPhoneColumn)
+        assertEquals(1, viewModel.state.value.selectedBackupPhoneColumn)
+
+        viewModel.onColumnHeaderClicked(1) // clear backup
+        assertNull(viewModel.state.value.selectedPhoneColumn)
+        assertNull(viewModel.state.value.selectedBackupPhoneColumn)
+    }
+
+    @Test
+    fun columnHeaderClickReplacesPrimaryWhenBothRolesOccupied() {
+        val viewModel = SendFlowViewModel()
+        viewModel.importClipboard("手机号\t备用手机号\t姓名\n13800138000\t13900139000\t张三")
+        viewModel.selectTemplate("template-1", "{姓名}您好")
+        viewModel.onColumnHeaderClicked(0)
+        viewModel.onColumnHeaderClicked(1)
+
+        viewModel.onColumnHeaderClicked(2)
+
+        val state = viewModel.state.value
+        assertEquals(2, state.selectedPhoneColumn)
+        assertEquals(1, state.selectedBackupPhoneColumn)
+    }
 }

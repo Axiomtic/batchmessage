@@ -16,5 +16,6 @@ object BulkSmsIcons {
     @DrawableRes val Send = R.drawable.ic_send
     @DrawableRes val Success = R.drawable.ic_success
     @DrawableRes val Error = R.drawable.ic_error
+    @DrawableRes val Refresh = R.drawable.ic_refresh
     @DrawableRes val Interval = R.drawable.ic_interval
 }

@@ -35,7 +35,7 @@ class EditableTableTest {
 
         composeRule.setContent {
             MaterialTheme {
-                EditableTable(table, onCellChanged = {}, onPhoneColumnSelected = {})
+                EditableTable(table, onCellChanged = {}, onColumnHeaderClicked = {})
             }
         }
 

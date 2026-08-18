@@ -136,7 +136,7 @@ class SmsScreenTest {
     }
 
     @Test
-    fun simCanBeSelectedFromSendPage() {
+    fun simCanBeSelectedFromSendPageMenu() {
         var selectedSubscription: Int? = null
         val state = SendFlowViewModel().state.value.copy(
             simOptions = listOf(SimOption(7, "SIM 1", 0), SimOption(9, "SIM 2", 1)),
@@ -162,10 +162,37 @@ class SmsScreenTest {
             }
         }
 
-        composeRule.onNodeWithTag("sim-selector").performClick()
+        composeRule.onNodeWithTag("sim-menu-button").performClick()
         composeRule.onNodeWithText("SIM 2").performClick()
 
         composeRule.runOnIdle { assertEquals(9, selectedSubscription) }
+    }
+
+    @Test
+    fun sendButtonCaptionShowsCurrentSim() {
+        val state = SendFlowViewModel().state.value.copy(
+            simOptions = listOf(SimOption(7, "SIM 1", 0)),
+            simDetectionState = SimDetectionState.AVAILABLE,
+            selectedSubscriptionId = 7,
+        )
+
+        composeRule.setContent {
+            MaterialTheme {
+                SmsScreen(
+                    state = state,
+                    templateState = TemplateUiState(
+                        templates = listOf(template),
+                        selectedTemplateId = template.id,
+                        editorName = template.name,
+                        editorBody = template.body,
+                        savedBody = template.body,
+                    ),
+                    callbacks = BulkSmsCallbacks(),
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("SIM 1").assertExists()
     }
 
     @Test
@@ -194,7 +221,7 @@ class SmsScreenTest {
             }
         }
 
-        composeRule.onNodeWithText("需要电话权限才能读取 SIM").assertExists()
+        composeRule.onNodeWithText("需授权读取 SIM").assertExists()
         composeRule.onNodeWithTag("grant-sim-permission").performClick()
         composeRule.runOnIdle { assertEquals(true, permissionRequested) }
     }

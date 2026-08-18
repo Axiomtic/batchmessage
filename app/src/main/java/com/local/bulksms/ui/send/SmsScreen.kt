@@ -8,17 +8,20 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -263,13 +266,6 @@ fun SmsScreen(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    SimSelector(
-                        state = state,
-                        enabled = controlsEnabled,
-                        menuOpen = simMenuOpen,
-                        onMenuOpenChange = { simMenuOpen = it },
-                        callbacks = callbacks,
-                    )
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -290,19 +286,17 @@ fun SmsScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
-                        Button(
-                            onClick = { showSendDialog = true },
-                            enabled = pendingMessageCount > 0 &&
+                        SendButtonWithSimMenu(
+                            state = state,
+                            enabled = controlsEnabled,
+                            menuOpen = simMenuOpen,
+                            onMenuOpenChange = { simMenuOpen = it },
+                            onSendClick = { showSendDialog = true },
+                            canSend = pendingMessageCount > 0 &&
                                 (state.selectedPhoneColumn != null || state.selectedBackupPhoneColumn != null) &&
                                 state.simOptions.any { it.subscriptionId == state.selectedSubscriptionId },
-                            modifier = Modifier.testTag("send-selected"),
-                        ) {
-                            Icon(
-                                painter = painterResource(BulkSmsIcons.Send),
-                                contentDescription = null,
-                            )
-                            Text("确认并发送")
-                        }
+                            callbacks = callbacks,
+                        )
                     }
                 }
             }
@@ -425,46 +419,73 @@ private fun SendProgressFooter(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun SimSelector(
+private fun SendButtonWithSimMenu(
     state: SendFlowUiState,
     enabled: Boolean,
     menuOpen: Boolean,
     onMenuOpenChange: (Boolean) -> Unit,
+    onSendClick: () -> Unit,
+    canSend: Boolean,
     callbacks: BulkSmsCallbacks,
 ) {
-    when (state.simDetectionState) {
-        SimDetectionState.AVAILABLE -> {
-            val selected = state.simOptions.firstOrNull {
-                it.subscriptionId == state.selectedSubscriptionId
-            }
-            ExposedDropdownMenuBox(
-                expanded = menuOpen,
-                onExpandedChange = {
-                    if (enabled && state.simOptions.isNotEmpty()) onMenuOpenChange(it)
-                },
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                OutlinedTextField(
-                    value = selected?.displayLabel.orEmpty(),
-                    onValueChange = {},
-                    readOnly = true,
-                    enabled = enabled,
-                    label = { Text("发送 SIM") },
-                    placeholder = { Text("选择发送 SIM") },
-                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = menuOpen) },
-                    colors = neutralOutlinedTextFieldColors(),
-                    modifier = Modifier
-                        .menuAnchor()
-                        .fillMaxWidth()
-                        .testTag("sim-selector"),
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Button(
+            onClick = onSendClick,
+            enabled = canSend && enabled,
+            modifier = Modifier.testTag("send-selected"),
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        painter = painterResource(BulkSmsIcons.Send),
+                        contentDescription = null,
+                    )
+                    Text("确认并发送")
+                }
+                Text(
+                    simCaption(state),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.85f),
+                    modifier = Modifier.testTag("send-sim-caption"),
                 )
-                ExposedDropdownMenu(
+            }
+        }
+
+        if (state.simDetectionState == SimDetectionState.AVAILABLE) {
+            Box {
+                IconButton(
+                    onClick = { onMenuOpenChange(true) },
+                    enabled = enabled,
+                    modifier = Modifier.testTag("sim-menu-button"),
+                ) {
+                    Icon(
+                        painter = painterResource(BulkSmsIcons.Sim),
+                        contentDescription = "选择 SIM",
+                        tint = if (state.selectedSubscriptionId == null) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                    )
+                }
+                DropdownMenu(
                     expanded = menuOpen,
                     onDismissRequest = { onMenuOpenChange(false) },
                 ) {
                     state.simOptions.forEach { sim ->
                         DropdownMenuItem(
-                            text = { Text(sim.displayLabel) },
+                            text = {
+                                Text(
+                                    if (sim.subscriptionId == state.selectedSubscriptionId) {
+                                        "✓ ${sim.displayLabel}"
+                                    } else {
+                                        sim.displayLabel
+                                    },
+                                )
+                            },
                             onClick = {
                                 onMenuOpenChange(false)
                                 callbacks.onSubscriptionSelected(sim.subscriptionId)
@@ -474,53 +495,51 @@ private fun SimSelector(
                     }
                 }
             }
+        } else {
+            when (state.simDetectionState) {
+                SimDetectionState.PERMISSION_REQUIRED -> IconButton(
+                    onClick = callbacks.onRequestSimPermission,
+                    enabled = enabled,
+                    modifier = Modifier.testTag("grant-sim-permission"),
+                ) {
+                    Icon(
+                        painter = painterResource(BulkSmsIcons.Sim),
+                        contentDescription = "授权读取 SIM",
+                        tint = MaterialTheme.colorScheme.error,
+                    )
+                }
+                SimDetectionState.EMPTY, SimDetectionState.ERROR -> IconButton(
+                    onClick = callbacks.onRefreshSimOptions,
+                    enabled = enabled,
+                    modifier = Modifier.testTag("refresh-sim"),
+                ) {
+                    Icon(
+                        painter = painterResource(BulkSmsIcons.Refresh),
+                        contentDescription = "重新检测 SIM",
+                    )
+                }
+                SimDetectionState.LOADING -> IconButton(
+                    onClick = {},
+                    enabled = false,
+                ) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp))
+                }
+                SimDetectionState.AVAILABLE -> Unit
+            }
         }
-        SimDetectionState.PERMISSION_REQUIRED -> Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                "需要电话权限才能读取 SIM",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            TextButton(
-                onClick = callbacks.onRequestSimPermission,
-                modifier = Modifier.testTag("grant-sim-permission"),
-            ) { Text("授权读取 SIM") }
-        }
-        SimDetectionState.LOADING -> Row(
-            modifier = Modifier.padding(vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            CircularProgressIndicator()
-            Text("正在检测 SIM", style = MaterialTheme.typography.bodySmall)
-        }
-        SimDetectionState.EMPTY -> Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                "没有检测到活动 SIM",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            TextButton(onClick = callbacks.onRefreshSimOptions) { Text("重新检测") }
-        }
-        SimDetectionState.ERROR -> Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                state.simDetectionError ?: "SIM 检测失败",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error,
-            )
-            TextButton(onClick = callbacks.onRefreshSimOptions) { Text("重试") }
-        }
+    }
+}
+
+@Composable
+private fun simCaption(state: SendFlowUiState): String {
+    val selected = state.simOptions.firstOrNull {
+        it.subscriptionId == state.selectedSubscriptionId
+    }
+    return selected?.displayLabel ?: when (state.simDetectionState) {
+        SimDetectionState.PERMISSION_REQUIRED -> "需授权读取 SIM"
+        SimDetectionState.LOADING -> "正在检测 SIM"
+        SimDetectionState.EMPTY -> "无 SIM 可用"
+        SimDetectionState.ERROR -> "SIM 检测失败"
+        SimDetectionState.AVAILABLE -> "选择 SIM"
     }
 }

@@ -146,8 +146,7 @@ fun DataScreen(
                 onCellChanged = { callbacks.onCellChanged(it.rowId, it.columnIndex, it.value) },
                 onAddRow = callbacks.onAddRow,
                 onAddColumn = callbacks.onAddColumn,
-                onPhoneColumnSelected = callbacks.onPhoneColumnSelected,
-                onBackupPhoneColumnSelected = callbacks.onBackupPhoneColumnSelected,
+                onColumnHeaderClicked = callbacks.onColumnHeaderClicked,
                 onDeleteRowRequested = { rowId ->
                     val ordinal = table.rows.indexOfFirst { it.id == rowId } + 1
                     deleteTarget = DeleteTarget.Row(rowId, ordinal)

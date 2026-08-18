@@ -40,6 +40,7 @@ data class BulkSmsCallbacks(
     val onHeaderModeChanged: (Boolean) -> Unit = {},
     val onPhoneColumnSelected: (Int) -> Unit = {},
     val onBackupPhoneColumnSelected: (Int) -> Unit = {},
+    val onColumnHeaderClicked: (Int) -> Unit = {},
     val onSubscriptionSelected: (Int) -> Unit = {},
     val onRequestSimPermission: () -> Unit = {},
     val onRefreshSimOptions: () -> Unit = {},

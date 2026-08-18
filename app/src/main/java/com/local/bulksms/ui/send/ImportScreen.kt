@@ -114,7 +114,7 @@ fun ImportScreen(
             EditableTable(
                 table = table,
                 onCellChanged = onCellChanged,
-                onPhoneColumnSelected = onPhoneColumnSelected,
+                onColumnHeaderClicked = onPhoneColumnSelected,
                 modifier = Modifier.weight(1f),
             )
         }

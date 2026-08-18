@@ -172,6 +172,58 @@ class SendFlowViewModel(
         }
     }
 
+    /**
+     * Column-header tap cycling: tapping an unassigned column makes it the primary
+     * phone column (or the backup when a primary already exists); tapping an
+     * assigned column clears that assignment.
+     */
+    fun onColumnHeaderClicked(columnIndex: Int) {
+        val current = mutableState.value
+        val table = current.table ?: return
+        if (columnIndex !in table.columns.indices) return
+        when (columnIndex) {
+            current.selectedPhoneColumn -> clearPhoneColumn()
+            current.selectedBackupPhoneColumn -> clearBackupPhoneColumn()
+            else -> {
+                if (current.selectedPhoneColumn == null) {
+                    selectPhoneColumn(columnIndex)
+                } else if (current.selectedBackupPhoneColumn == null) {
+                    selectBackupPhoneColumn(columnIndex)
+                } else {
+                    // Both roles are occupied: the tapped column becomes the new
+                    // primary and the previous primary is released.
+                    selectPhoneColumn(columnIndex)
+                }
+            }
+        }
+    }
+
+    private fun clearPhoneColumn() {
+        val current = mutableState.value
+        val table = current.table ?: return
+        val updatedTable = table.copy(phoneColumnIndex = null)
+        updateState {
+            current.copy(
+                selectedPhoneColumn = null,
+                table = updatedTable,
+                blockingError = null,
+            ).replaceDrafts(refreshDrafts(current, updatedTable))
+        }
+    }
+
+    private fun clearBackupPhoneColumn() {
+        val current = mutableState.value
+        val table = current.table ?: return
+        val updatedTable = table.copy(backupPhoneColumnIndex = null)
+        updateState {
+            current.copy(
+                selectedBackupPhoneColumn = null,
+                table = updatedTable,
+                blockingError = null,
+            ).replaceDrafts(refreshDrafts(current, updatedTable))
+        }
+    }
+
     fun toggleDraftSelection(rowId: Long, selected: Boolean) {
         val current = mutableState.value
         if (current.drafts.none { it.rowId == rowId }) return
