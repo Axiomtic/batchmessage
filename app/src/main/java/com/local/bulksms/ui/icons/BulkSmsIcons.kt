@@ -19,4 +19,5 @@ object BulkSmsIcons {
     @DrawableRes val Refresh = R.drawable.ic_refresh
     @DrawableRes val ArrowDropDown = R.drawable.ic_arrow_drop_down
     @DrawableRes val Interval = R.drawable.ic_interval
+    @DrawableRes val Share = R.drawable.ic_share
 }

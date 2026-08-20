@@ -8,6 +8,7 @@ import com.local.bulksms.data.SendItemEntity
 import com.local.bulksms.data.TemplateEntity
 import com.local.bulksms.importdata.ExcelImporter
 import com.local.bulksms.importdata.HeaderDetector
+import com.local.bulksms.importdata.PhoneAvailability
 import com.local.bulksms.importdata.PhoneColumnDetector
 import com.local.bulksms.importdata.PhoneNumberChecker
 import com.local.bulksms.importdata.TabularTextParser
@@ -312,11 +313,11 @@ class SendFlowViewModel(
     }
 
     fun setShowAvailable(show: Boolean) = updateState {
-        it.copy(showAvailable = show)
+        it.copy(showAvailable = show, draftsStale = true)
     }
 
     fun setShowUnavailable(show: Boolean) = updateState {
-        it.copy(showUnavailable = show)
+        it.copy(showUnavailable = show, draftsStale = true)
     }
 
     suspend fun createSelectedSendTask(): String? {
@@ -581,6 +582,7 @@ class SendFlowViewModel(
                         draft.rowId != rowId -> draft
                         !synced -> draft.copy(syncWithTable = false)
                         else -> DraftSynchronizer.setSynced(draft, true, requireNotNull(row), template)
+                            .withVisibleNumbers(current.showAvailable, current.showUnavailable)
                     }
                 },
                 blockingError = null,
@@ -603,6 +605,7 @@ class SendFlowViewModel(
                 drafts = current.drafts.map { draft ->
                     rows[draft.rowId]?.let { row ->
                         DraftSynchronizer.setSynced(draft, true, row, template)
+                            .withVisibleNumbers(current.showAvailable, current.showUnavailable)
                     } ?: draft.copy(syncWithTable = false)
                 },
                 blockingError = if (detached) "没有对应表格行的独立短信保持不同步" else null,
@@ -617,12 +620,28 @@ class SendFlowViewModel(
         val rawRowIndex = rowId.toInt() + if (table.firstRowIsHeader) 1 else 0
         val rawRow = raw.rows.getOrNull(rawRowIndex) ?: return
         if (columnIndex !in table.columns.indices) return
-        val updatedRows = raw.rows.toMutableList().also { rows ->
+        // Editing a single cell: patch the raw row in place and the materialized row
+        // directly, skipping the full re-materialization pass so large sheets stay
+        // smooth while typing. Column structure and row ids are unchanged.
+        val updatedRawRows = raw.rows.toMutableList().also { rows ->
             rows[rawRowIndex] = rawRow.padTo(table.columns.size).toMutableList().also { cells ->
                 cells[columnIndex] = value
             }
         }
-        rematerializeCurrent(raw.copy(rows = updatedRows))
+        val updatedTableRows = table.rows.map { row ->
+            if (row.id != rowId) row else row.copy(
+                cells = row.cells.padTo(table.columns.size).toMutableList().also { cells ->
+                    cells[columnIndex] = value
+                },
+            )
+        }
+        updateState {
+            current.copy(
+                rawTable = raw.copy(rows = updatedRawRows),
+                table = table.copy(rows = updatedTableRows),
+                draftsStale = true,
+            )
+        }
     }
 
     fun editHeader(columnIndex: Int, value: String) {
@@ -732,20 +751,25 @@ class SendFlowViewModel(
                 val phoneColumn = PhoneColumnDetector.recommend(materialized)
                 val table = materialized.copy(phoneColumnIndex = phoneColumn)
                 val missing = templateMissing(table)
+                val withImport = current.copy(
+                    rawTable = raw,
+                    table = table,
+                    detectedHeader = detectedHeader,
+                    selectedPhoneColumn = phoneColumn,
+                    selectedBackupPhoneColumn = null,
+                    importWarnings = raw.warnings,
+                    blockingError = missing.toTemplateError(),
+                    missingTemplateVariables = missing,
+                    importId = idFactory(),
+                    pendingImport = null,
+                    draftsStale = false,
+                    // New data: reopen the visibility filters so the preview
+                    // and the sent numbers reflect the freshly imported rows.
+                    showAvailable = true,
+                    showUnavailable = true,
+                )
                 updateState {
-                    current.copy(
-                        rawTable = raw,
-                        table = table,
-                        detectedHeader = detectedHeader,
-                        selectedPhoneColumn = phoneColumn,
-                        selectedBackupPhoneColumn = null,
-                        importWarnings = raw.warnings,
-                        blockingError = missing.toTemplateError(),
-                        missingTemplateVariables = missing,
-                        importId = idFactory(),
-                        pendingImport = null,
-                        draftsStale = false,
-                    ).replaceDrafts(refreshDrafts(current, table))
+                    withImport.replaceDrafts(refreshDrafts(withImport, table))
                 }
             },
             onFailure = { error -> updateState { it.copy(blockingError = error.message ?: "无法处理数据") } },
@@ -814,11 +838,33 @@ class SendFlowViewModel(
         val rowIds = rowsWithData.mapTo(mutableSetOf()) { it.id }
         val existing = current.drafts.associateBy { it.rowId }
         val refreshed = rowsWithData.map { row ->
-            existing[row.id]?.let { draft -> DraftSynchronizer.regenerate(draft, row, template, renderer) }
+            val draft = existing[row.id]?.let { DraftSynchronizer.regenerate(it, row, template, renderer) }
                 ?: renderer.renderDraft(row, template)
+            draft.withVisibleNumbers(current.showAvailable, current.showUnavailable)
         }
-        val detached = current.drafts.filter { !it.syncWithTable && it.rowId !in rowIds }
+        val detached = current.drafts
+            .filter { !it.syncWithTable && it.rowId !in rowIds }
+            .map { it.withVisibleNumbers(current.showAvailable, current.showUnavailable) }
         return refreshed + detached
+    }
+
+    /**
+     * The preview (and therefore what gets sent) must reflect the visibility toggles:
+     * numbers of a hidden category are stripped from the draft, so the preview shows
+     * exactly the numbers that will be sent.
+     */
+    private fun MessageDraft.withVisibleNumbers(showAvailable: Boolean, showUnavailable: Boolean): MessageDraft {
+        fun visible(text: String): String {
+            val numbers = PhoneNumberChecker.extractMobileNumbers(text)
+            return numbers.filter { number ->
+                val isAvailable = PhoneNumberChecker.availability(number) == PhoneAvailability.AVAILABLE
+                (isAvailable && showAvailable) || (!isAvailable && showUnavailable)
+            }.joinToString(";")
+        }
+        return copy(
+            phoneNumber = visible(phoneNumber),
+            backupPhoneNumber = visible(backupPhoneNumber),
+        )
     }
 
     private fun templateMissing(table: ImportedTable): Set<String> {

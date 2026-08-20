@@ -1,5 +1,6 @@
 package com.local.bulksms.ui.send
 
+import com.local.bulksms.importdata.PhoneNumberChecker
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
@@ -314,5 +315,68 @@ class SendFlowViewModelTest {
         val state = viewModel.state.value
         assertEquals(2, state.selectedPhoneColumn)
         assertEquals(1, state.selectedBackupPhoneColumn)
+    }
+
+    @Test
+    fun hidingAvailableNumbersRemovesThemFromRefreshedPreview() {
+        val viewModel = SendFlowViewModel()
+        // The default workspace has 13800138000 (available) in the 电话 column.
+        viewModel.setShowAvailable(false)
+
+        assertTrue(viewModel.state.value.draftsStale)
+        viewModel.refreshPreview()
+
+        val state = viewModel.state.value
+        assertTrue(
+            state.drafts.all { draft ->
+                PhoneNumberChecker.extractMobileNumbers(draft.phoneNumber)
+                    .none { it == "13800138000" }
+            },
+        )
+        assertTrue(state.drafts.all { it.phoneNumber.isBlank() })
+    }
+
+    @Test
+    fun hidingUnavailableNumbersKeepsOnlyAvailableNumbersInPreview() {
+        val viewModel = SendFlowViewModel()
+        viewModel.importClipboard("电话\n13800138000")
+        viewModel.selectPhoneColumn(0)
+        viewModel.selectTemplate("template-1", "您好")
+
+        viewModel.setShowUnavailable(false)
+        viewModel.refreshPreview()
+
+        val state = viewModel.state.value
+        assertEquals(listOf("13800138000"), state.drafts.flatMap {
+            PhoneNumberChecker.extractMobileNumbers(it.phoneNumber)
+        })
+    }
+
+    @Test
+    fun importingNewDataReopensVisibilityToggles() {
+        val viewModel = SendFlowViewModel()
+        viewModel.setShowAvailable(false)
+        viewModel.setShowUnavailable(false)
+
+        viewModel.importClipboard("手机号\t姓名\n13800138000\t张三")
+
+        val state = viewModel.state.value
+        assertTrue(state.showAvailable)
+        assertTrue(state.showUnavailable)
+    }
+
+    @Test
+    fun editingACellKeepsPhoneColumnRoleAndSkipsRematerialization() {
+        val viewModel = SendFlowViewModel()
+        val originalRows = viewModel.state.value.table?.rows
+
+        viewModel.editCell(rowId = 1L, columnIndex = 1, value = "13900139000")
+
+        val state = viewModel.state.value
+        assertEquals(1, state.selectedPhoneColumn)
+        assertEquals("13900139000", state.table?.rows?.firstOrNull { it.id == 1L }?.cells?.get(1))
+        assertTrue(state.draftsStale)
+        // Row ids stay stable so the lazy table keeps its scroll position.
+        assertEquals(originalRows?.map { it.id }, state.table?.rows?.map { it.id })
     }
 }

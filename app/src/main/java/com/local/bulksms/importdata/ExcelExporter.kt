@@ -18,33 +18,49 @@ import org.json.JSONArray
  */
 object ExcelExporter {
 
+    /** Parsed view of a history entry, used by the history detail screen and export. */
+    data class HistorySnapshot(
+        val headerNames: List<String>,
+        val rows: List<List<String>>,
+        val phoneColumnIndex: Int?,
+        val backupPhoneColumnIndex: Int?,
+        val sentNumbers: Set<String>,
+    ) {
+        /** Rows reduced to the successfully sent numbers, dropping rows with none. */
+        val exportRows: List<List<String>> by lazy {
+            val phoneIndexes = listOfNotNull(phoneColumnIndex, backupPhoneColumnIndex)
+            rows.mapNotNull { row ->
+                val cells = row.toMutableList()
+                var hasSentNumber = false
+                for (index in phoneIndexes) {
+                    val cell = cells.getOrNull(index).orEmpty()
+                    val numbers = PhoneNumberChecker.extractMobileNumbers(cell)
+                    if (numbers.isEmpty()) continue
+                    val sent = numbers.filter { it in sentNumbers }
+                    if (sent.isNotEmpty()) hasSentNumber = true
+                    cells[index] = sent.joinToString(";")
+                }
+                if (hasSentNumber) cells else null
+            }
+        }
+    }
+
+    fun snapshotOf(history: SendHistoryEntity): HistorySnapshot = HistorySnapshot(
+        headerNames = decodeStrings(history.headerNamesJson),
+        rows = decodeRows(history.rawRowsJson),
+        phoneColumnIndex = history.phoneColumnIndex,
+        backupPhoneColumnIndex = history.backupPhoneColumnIndex,
+        sentNumbers = decodeStrings(history.sentNumbersJson).toSet(),
+    )
+
     fun exportTable(headerNames: List<String>, rows: List<List<String>>): ByteArray =
         buildWorkbook(headerNames, rows)
 
     /** Exports a history entry: same columns as the snapshot table, phone cells kept
      *  to the successfully sent numbers; rows with no sent numbers are dropped. */
     fun exportHistory(history: SendHistoryEntity): ByteArray {
-        val headerNames = decodeStrings(history.headerNamesJson)
-        val rows = decodeRows(history.rawRowsJson)
-        val sentNumbers = decodeStrings(history.sentNumbersJson).toSet()
-        val phoneIndexes = listOfNotNull(
-            history.phoneColumnIndex,
-            history.backupPhoneColumnIndex,
-        )
-        val exportRows = rows.mapNotNull { row ->
-            val cells = row.toMutableList()
-            var hasSentNumber = false
-            for (index in phoneIndexes) {
-                val cell = cells.getOrNull(index).orEmpty()
-                val numbers = PhoneNumberChecker.extractMobileNumbers(cell)
-                if (numbers.isEmpty()) continue
-                val sent = numbers.filter { it in sentNumbers }
-                if (sent.isNotEmpty()) hasSentNumber = true
-                cells[index] = sent.joinToString(";")
-            }
-            if (hasSentNumber) cells else null
-        }
-        return buildWorkbook(headerNames, exportRows)
+        val snapshot = snapshotOf(history)
+        return buildWorkbook(snapshot.headerNames, snapshot.exportRows)
     }
 
     private fun buildWorkbook(headerNames: List<String>, rows: List<List<String>>): ByteArray {

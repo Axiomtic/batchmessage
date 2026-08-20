@@ -4,7 +4,6 @@ import android.content.ClipboardManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import com.local.bulksms.importdata.PhoneNumberChecker
 import com.local.bulksms.model.ImportedTable
 import com.local.bulksms.ui.BulkSmsCallbacks
+import com.local.bulksms.ui.components.RoundedIconAction
 import com.local.bulksms.ui.icons.BulkSmsIcons
 import com.local.bulksms.ui.send.EditableTable
 import com.local.bulksms.ui.send.SendFlowUiState
@@ -128,24 +129,11 @@ fun DataScreen(
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    SquareToggleButton(
-                        active = state.showAvailable,
-                        activeColor = Color(0xFF2E7D32),
-                        contentDescription = "可用电话",
-                        testTag = "toggle-available",
-                        onClick = { callbacks.onShowAvailableChanged(!state.showAvailable) },
-                    )
-                    SquareToggleButton(
-                        active = state.showUnavailable,
-                        activeColor = Color(0xFFC62828),
-                        contentDescription = "不可用电话",
-                        testTag = "toggle-unavailable",
-                        onClick = { callbacks.onShowUnavailableChanged(!state.showUnavailable) },
-                    )
-                    SquareActionButton(
+                    RoundedIconAction(
+                        iconRes = BulkSmsIcons.Share,
                         contentDescription = "导出表格",
-                        testTag = "export-table",
                         onClick = callbacks.onExportTable,
+                        modifier = Modifier.testTag("export-table"),
                     )
                 }
             }
@@ -180,23 +168,54 @@ fun DataScreen(
                 )
             }
 
-            EditableTable(
-                table = table,
-                onCellChanged = { callbacks.onCellChanged(it.rowId, it.columnIndex, it.value) },
-                onAddRow = callbacks.onAddRow,
-                onAddColumn = callbacks.onAddColumn,
-                onColumnHeaderClicked = callbacks.onColumnHeaderClicked,
-                showAvailable = state.showAvailable,
-                showUnavailable = state.showUnavailable,
-                onDeleteRowRequested = { rowId ->
-                    val ordinal = table.rows.indexOfFirst { it.id == rowId } + 1
-                    deleteTarget = DeleteTarget.Row(rowId, ordinal)
-                },
-                onDeleteColumnRequested = { index ->
-                    deleteTarget = DeleteTarget.Column(index, table.columns[index].name)
-                },
-                modifier = Modifier.weight(1f),
-            )
+            // The visibility filters float at the top-right of the table viewport so
+            // they stay reachable while scrolling; the share button lives in the
+            // block header above. Without a phone column there is nothing to filter.
+            val hasPhoneColumn = table.phoneColumnIndex != null || table.backupPhoneColumnIndex != null
+            Box(modifier = Modifier.weight(1f)) {
+                EditableTable(
+                    table = table,
+                    onCellChanged = { callbacks.onCellChanged(it.rowId, it.columnIndex, it.value) },
+                    onAddRow = callbacks.onAddRow,
+                    onAddColumn = callbacks.onAddColumn,
+                    onColumnHeaderClicked = callbacks.onColumnHeaderClicked,
+                    showAvailable = state.showAvailable,
+                    showUnavailable = state.showUnavailable,
+                    onDeleteRowRequested = { rowId ->
+                        val ordinal = table.rows.indexOfFirst { it.id == rowId } + 1
+                        deleteTarget = DeleteTarget.Row(rowId, ordinal)
+                    },
+                    onDeleteColumnRequested = { index ->
+                        deleteTarget = DeleteTarget.Column(index, table.columns[index].name)
+                    },
+                    modifier = Modifier.fillMaxSize(),
+                )
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(top = 44.dp, end = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    VisibilityToggleButton(
+                        active = state.showAvailable,
+                        enabled = hasPhoneColumn,
+                        activeColor = Color(0xFF2E7D32),
+                        iconRes = BulkSmsIcons.Success,
+                        contentDescription = "可用电话",
+                        testTag = "toggle-available",
+                        onClick = { callbacks.onShowAvailableChanged(!state.showAvailable) },
+                    )
+                    VisibilityToggleButton(
+                        active = state.showUnavailable,
+                        enabled = hasPhoneColumn,
+                        activeColor = Color(0xFFC62828),
+                        iconRes = BulkSmsIcons.Error,
+                        contentDescription = "不可用电话",
+                        testTag = "toggle-unavailable",
+                        onClick = { callbacks.onShowUnavailableChanged(!state.showUnavailable) },
+                    )
+                }
+            }
         }
 
         state.blockingError?.let { error ->
@@ -295,59 +314,41 @@ private fun ImportCard(
     }
 }
 
-/** Square, cornerless toggle button used for the available/unavailable phone filters. */
+/**
+ * Visibility filter toggle pinned to the table viewport's top-right corner.
+ * Borderless with a solid background in a 2:1 (width:height) shape; a check icon
+ * marks the available filter and a warning triangle the unavailable one. The
+ * opacity drops when the filter is off, and further when no phone column exists.
+ */
 @Composable
-private fun SquareToggleButton(
+private fun VisibilityToggleButton(
     active: Boolean,
+    enabled: Boolean,
     activeColor: Color,
+    iconRes: Int,
     contentDescription: String,
     testTag: String,
     onClick: () -> Unit,
 ) {
-    Box(
-        modifier = Modifier
-            .size(34.dp)
-            .background(
-                if (active) activeColor else MaterialTheme.colorScheme.surfaceContainerHighest,
-                shape = RoundedCornerShape(0.dp),
-            )
-            .border(
-                width = if (active) 0.dp else 1.5.dp,
-                color = if (active) activeColor else activeColor.copy(alpha = 0.55f),
-            )
-            .clickable(onClick = onClick)
-            .testTag(testTag),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(
-            painter = painterResource(BulkSmsIcons.Phone),
-            contentDescription = contentDescription,
-            tint = if (active) Color.White else activeColor,
-            modifier = Modifier.size(18.dp),
-        )
+    val backgroundAlpha = when {
+        !enabled -> 0.15f
+        active -> 1f
+        else -> 0.38f
     }
-}
-
-/** Square, cornerless action button (e.g. export). */
-@Composable
-private fun SquareActionButton(
-    contentDescription: String,
-    testTag: String,
-    onClick: () -> Unit,
-) {
     Box(
         modifier = Modifier
-            .size(34.dp)
-            .background(MaterialTheme.colorScheme.primary, shape = RoundedCornerShape(0.dp))
-            .clickable(onClick = onClick)
+            .width(56.dp)
+            .height(28.dp)
+            .background(activeColor.copy(alpha = backgroundAlpha), shape = RoundedCornerShape(0.dp))
+            .clickable(enabled = enabled, onClick = onClick)
             .testTag(testTag),
         contentAlignment = Alignment.Center,
     ) {
         Icon(
-            painter = painterResource(BulkSmsIcons.File),
+            painter = painterResource(iconRes),
             contentDescription = contentDescription,
-            tint = MaterialTheme.colorScheme.onPrimary,
-            modifier = Modifier.size(18.dp),
+            tint = Color.White.copy(alpha = if (active) 1f else 0.85f),
+            modifier = Modifier.size(16.dp),
         )
     }
 }

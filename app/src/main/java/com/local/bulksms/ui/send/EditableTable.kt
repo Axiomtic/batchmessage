@@ -85,8 +85,16 @@ fun EditableTable(
     }
     val columnsWidth = columnWidths.fold(0.dp) { total, width -> total + width }
     val contentWidth = 36.dp + columnsWidth + 40.dp
-    val visibleRows = table.rows.filter { row ->
-        isRowVisible(row, table, showAvailable, showUnavailable)
+    // With both filters on (the default) every row is visible, so skip the per-row
+    // phone-number scan entirely; this keeps typing in a large sheet smooth.
+    val visibleRows = remember(table, showAvailable, showUnavailable) {
+        if (showAvailable && showUnavailable) {
+            table.rows
+        } else {
+            table.rows.filter { row ->
+                isRowVisible(row, table, showAvailable, showUnavailable)
+            }
+        }
     }
 
     Box(
@@ -175,7 +183,7 @@ fun EditableTable(
                                     textStyle = MaterialTheme.typography.bodySmall.copy(color = textColor),
                                 )
                             } else {
-                                val hidden = isPhoneColumn &&
+                                val hidden = isPhoneColumn && !(showAvailable && showUnavailable) &&
                                     cellHasHiddenNumbers(value, showAvailable, showUnavailable)
                                 Box(
                                     modifier = cellModifier

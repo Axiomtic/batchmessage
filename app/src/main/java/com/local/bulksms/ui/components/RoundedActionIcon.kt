@@ -1,5 +1,6 @@
 package com.local.bulksms.ui.components
 
+import androidx.annotation.DrawableRes
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
@@ -10,6 +11,7 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -20,6 +22,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -64,6 +67,53 @@ fun RoundedActionIcon(
         Canvas(Modifier.size(14.dp)) {
             drawRoundedGlyph(kind, foreground.copy(alpha = if (enabled) 1f else 0.35f))
         }
+    }
+}
+
+/**
+ * A borderless round action button carrying an icon, sharing the look of the
+ * template +/- buttons ([RoundedActionIcon]) so the export/share actions in the
+ * data table and the history detail match them.
+ */
+@Composable
+fun RoundedIconAction(
+    @DrawableRes iconRes: Int,
+    contentDescription: String,
+    onClick: () -> Unit,
+    enabled: Boolean = true,
+    tint: Color = MaterialTheme.colorScheme.primary,
+    modifier: Modifier = Modifier,
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val pressedBackground = tint.copy(alpha = 0.18f)
+    val background by animateColorAsState(
+        targetValue = if (pressed && enabled) pressedBackground else Color.Transparent,
+        animationSpec = if (pressed) snap() else tween(850),
+        label = "rounded-icon-action-background",
+    )
+    val description = contentDescription
+
+    Box(
+        modifier = modifier
+            .size(40.dp)
+            .clip(CircleShape)
+            .semantics { this.contentDescription = description }
+            .clickable(
+                enabled = enabled,
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick,
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        Canvas(Modifier.matchParentSize()) { drawCircle(background) }
+        Icon(
+            painter = painterResource(iconRes),
+            contentDescription = null,
+            tint = tint.copy(alpha = if (enabled) 1f else 0.35f),
+            modifier = Modifier.size(20.dp),
+        )
     }
 }
 

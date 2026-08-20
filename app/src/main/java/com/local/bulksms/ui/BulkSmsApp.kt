@@ -1,5 +1,6 @@
 package com.local.bulksms.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -74,6 +75,10 @@ fun BulkSmsApp(
     showHistory: Boolean = false,
     onHistoryBack: () -> Unit = {},
 ) {
+    // The history screen replaces the whole app shell, so without this handler the
+    // system back button would exit the app instead of returning to the settings.
+    BackHandler(enabled = showHistory) { onHistoryBack() }
+
     if (showHistory) {
         HistoryScreen(
             history = history,
