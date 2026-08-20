@@ -27,6 +27,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -71,10 +72,6 @@ fun EditableTable(
     val borderColor = MaterialTheme.colorScheme.outlineVariant
     val headerColor = MaterialTheme.colorScheme.surfaceVariant
     var editingCell by remember { mutableStateOf<Pair<Long, Int>?>(null) }
-    val focusRequester = remember { FocusRequester() }
-    LaunchedEffect(editingCell) {
-        if (editingCell != null) focusRequester.requestFocus()
-    }
     val columnWidths = remember(table) {
         table.columns.mapIndexed { index, column ->
             contentAwareColumnWidth(
@@ -159,6 +156,19 @@ fun EditableTable(
                                 .border(0.5.dp, borderColor)
                                 .padding(horizontal = 8.dp, vertical = 9.dp)
                             if (editingCell == (row.id to columnIndex)) {
+                                val focusRequester = remember { FocusRequester() }
+                                // onFocusChanged fires once right when the field enters
+                                // composition with the "not focused" state; clearing the
+                                // edit cell on that first callback would instantly undo
+                                // the tap. Only clear after the field actually had focus.
+                                var hasFocus by remember { mutableStateOf(false) }
+                                LaunchedEffect(Unit) {
+                                    // The field is only attached after the first
+                                    // frame; requesting focus earlier silently fails
+                                    // and the cell would snap back to read-only.
+                                    withFrameNanos { }
+                                    focusRequester.requestFocus()
+                                }
                                 BasicTextField(
                                     value = value,
                                     onValueChange = { newValue ->
@@ -167,7 +177,8 @@ fun EditableTable(
                                     modifier = cellModifier
                                         .focusRequester(focusRequester)
                                         .onFocusChanged { focusState ->
-                                            if (!focusState.isFocused) editingCell = null
+                                            if (hasFocus && !focusState.isFocused) editingCell = null
+                                            hasFocus = focusState.isFocused
                                         }
                                         .testTag("cell-${row.id}-$columnIndex"),
                                     singleLine = true,
