@@ -24,6 +24,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.local.bulksms.data.BulkSmsRepository
+import com.local.bulksms.data.SendHistoryEntity
+import com.local.bulksms.importdata.ExcelExporter
 import com.local.bulksms.sms.SimSubscriptionProvider
 import com.local.bulksms.sms.SendPreferences
 import com.local.bulksms.sms.SmsPermissions
@@ -54,6 +56,11 @@ class MainActivity : ComponentActivity() {
                 val templateState by templateViewModel.state.collectAsState()
                 var externalDataNavigationRequest by remember { mutableLongStateOf(0L) }
                 var simPermissionRequested by remember { mutableStateOf(false) }
+                var showHistory by remember { mutableStateOf(false) }
+                var history by remember { mutableStateOf<List<SendHistoryEntity>>(emptyList()) }
+                LaunchedEffect(app.repository) {
+                    app.repository.historyDao.observeAll().collect { history = it }
+                }
                 val composeScope = rememberCoroutineScope()
                 val simProvider = remember { SimSubscriptionProvider(this@MainActivity) }
                 val sendPreferences = remember { SendPreferences(this@MainActivity) }
@@ -155,6 +162,8 @@ class MainActivity : ComponentActivity() {
                         onPhoneColumnSelected = sendFlowViewModel::selectPhoneColumn,
                         onBackupPhoneColumnSelected = sendFlowViewModel::selectBackupPhoneColumn,
                         onColumnHeaderClicked = sendFlowViewModel::onColumnHeaderClicked,
+                        onShowAvailableChanged = sendFlowViewModel::setShowAvailable,
+                        onShowUnavailableChanged = sendFlowViewModel::setShowUnavailable,
                         onAddRow = sendFlowViewModel::addRow,
                         onAddColumn = sendFlowViewModel::addColumn,
                         onDeleteRow = sendFlowViewModel::deleteRow,
@@ -211,8 +220,30 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
                         },
+                        onOpenHistory = { showHistory = true },
+                        onExportTable = {
+                            val state = sendState
+                            val table = state.table ?: return@BulkSmsCallbacks
+                            val bytes = ExcelExporter.exportTable(
+                                headerNames = table.columns.map { it.name },
+                                rows = table.rows.map { it.cells },
+                            )
+                            ExcelExporter.shareXlsx(this@MainActivity, "数据表.xlsx", bytes, "分享数据表")
+                        },
+                        onExportHistory = { entry ->
+                            val bytes = ExcelExporter.exportHistory(entry)
+                            ExcelExporter.shareXlsx(
+                                this@MainActivity,
+                                "历史记录-${entry.completedAt}.xlsx",
+                                bytes,
+                                "分享历史记录",
+                            )
+                        },
                     ),
                     externalDataNavigationRequest = externalDataNavigationRequest,
+                    history = history,
+                    showHistory = showHistory,
+                    onHistoryBack = { showHistory = false },
                 )
             }
         }

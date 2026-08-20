@@ -20,7 +20,9 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.local.bulksms.data.SendHistoryEntity
 import com.local.bulksms.ui.data.DataScreen
+import com.local.bulksms.ui.history.HistoryScreen
 import com.local.bulksms.ui.send.SendFlowUiState
 import com.local.bulksms.ui.send.SmsScreen
 import com.local.bulksms.ui.settings.SettingsScreen
@@ -41,6 +43,11 @@ data class BulkSmsCallbacks(
     val onPhoneColumnSelected: (Int) -> Unit = {},
     val onBackupPhoneColumnSelected: (Int) -> Unit = {},
     val onColumnHeaderClicked: (Int) -> Unit = {},
+    val onShowAvailableChanged: (Boolean) -> Unit = {},
+    val onShowUnavailableChanged: (Boolean) -> Unit = {},
+    val onExportTable: () -> Unit = {},
+    val onExportHistory: (SendHistoryEntity) -> Unit = {},
+    val onOpenHistory: () -> Unit = {},
     val onSubscriptionSelected: (Int) -> Unit = {},
     val onRequestSimPermission: () -> Unit = {},
     val onRefreshSimOptions: () -> Unit = {},
@@ -63,7 +70,19 @@ fun BulkSmsApp(
     templateState: TemplateUiState,
     callbacks: BulkSmsCallbacks,
     externalDataNavigationRequest: Long = 0L,
+    history: List<SendHistoryEntity> = emptyList(),
+    showHistory: Boolean = false,
+    onHistoryBack: () -> Unit = {},
 ) {
+    if (showHistory) {
+        HistoryScreen(
+            history = history,
+            onExport = callbacks.onExportHistory,
+            onBack = onHistoryBack,
+        )
+        return
+    }
+
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route ?: AppDestination.DATA.route

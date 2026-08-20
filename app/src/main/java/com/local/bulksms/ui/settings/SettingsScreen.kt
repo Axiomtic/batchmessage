@@ -1,5 +1,6 @@
 package com.local.bulksms.ui.settings
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -74,6 +75,36 @@ fun SettingsScreen(
         item {
             SettingsGroup(title = "SIM 卡权限", iconRes = BulkSmsIcons.Sim) {
                 SimPermissionContent(state = state, callbacks = callbacks)
+            }
+        }
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth().clickable(onClick = callbacks.onOpenHistory)
+                    .testTag("open-history"),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column {
+                        Text("历史记录", style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            "查看和导出每次批量发送的记录",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Icon(
+                        painter = painterResource(BulkSmsIcons.File),
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                }
             }
         }
     }
