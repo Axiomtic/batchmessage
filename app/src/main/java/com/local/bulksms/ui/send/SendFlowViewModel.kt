@@ -3,15 +3,19 @@ package com.local.bulksms.ui.send
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.local.bulksms.data.BulkSmsRepository
+import com.local.bulksms.data.SendHistoryEntity
+import com.local.bulksms.data.SendItemEntity
 import com.local.bulksms.data.TemplateEntity
 import com.local.bulksms.importdata.ExcelImporter
 import com.local.bulksms.importdata.HeaderDetector
 import com.local.bulksms.importdata.PhoneColumnDetector
+import com.local.bulksms.importdata.PhoneNumberChecker
 import com.local.bulksms.importdata.TabularTextParser
 import com.local.bulksms.importdata.TableImporter
 import com.local.bulksms.model.ImportedTable
 import com.local.bulksms.model.MessageDraft
 import com.local.bulksms.model.RawTable
+import com.local.bulksms.model.SendStatus
 import com.local.bulksms.model.WorkspaceSnapshot
 import com.local.bulksms.sms.SimOption
 import com.local.bulksms.sms.DEFAULT_SEND_INTERVAL_MILLIS
@@ -26,6 +30,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import org.json.JSONArray
 
 data class PendingImport(
     val rawTable: RawTable,
@@ -66,6 +71,9 @@ data class SendFlowUiState(
     val workspaceReady: Boolean = true,
     /** True when the preview needs a manual refresh to match the current data/template. */
     val draftsStale: Boolean = false,
+    /** Visibility toggles: whether available / unavailable phone numbers are shown and sent. */
+    val showAvailable: Boolean = true,
+    val showUnavailable: Boolean = true,
 )
 
 class SendFlowViewModel(
@@ -303,6 +311,14 @@ class SendFlowViewModel(
         it.copy(sendIntervalMillis = intervalMillis.coerceIn(0L, MAX_SEND_INTERVAL_MILLIS))
     }
 
+    fun setShowAvailable(show: Boolean) = updateState {
+        it.copy(showAvailable = show)
+    }
+
+    fun setShowUnavailable(show: Boolean) = updateState {
+        it.copy(showUnavailable = show)
+    }
+
     suspend fun createSelectedSendTask(): String? {
         val current = mutableState.value
         val selectedDrafts = current.drafts.filter { it.rowId in current.selectedDraftRowIds }
@@ -331,6 +347,8 @@ class SendFlowViewModel(
                 importId = importId,
                 simSubscriptionId = subscriptionId,
                 selectedRowIds = current.selectedDraftRowIds,
+                showAvailable = current.showAvailable,
+                showUnavailable = current.showUnavailable,
             )
         } catch (error: IllegalArgumentException) {
             updateState { current.copy(blockingError = error.message ?: "无法创建发送任务") }
@@ -354,12 +372,90 @@ class SendFlowViewModel(
         val targetRepository = repository ?: return
         sendProgressJob?.cancel()
         sendProgressJob = viewModelScope.launch {
+            var wasRunning = true
             targetRepository.sendDao.items(taskId).collect { items ->
-                mutableState.value = mutableState.value.copy(
-                    sendProgress = SendProgressUiState.from(items.map { it.status }),
-                )
+                val progress = SendProgressUiState.from(items.map { it.status })
+                mutableState.value = mutableState.value.copy(sendProgress = progress)
+                if (wasRunning && !progress.running) {
+                    wasRunning = false
+                    handleSendCompleted(taskId, items)
+                }
             }
         }
+    }
+
+    private fun handleSendCompleted(taskId: String, items: List<SendItemEntity>) {
+        val succeededNumbers = items.filter { it.status == SendStatus.SUBMITTED }
+            .map { it.phoneNumber }
+            .toSet()
+        // Record the history first (using the table as it was at send time), then prune.
+        writeSendHistory(taskId, items.size, succeededNumbers)
+        removeSentNumbers(succeededNumbers)
+    }
+
+    private fun writeSendHistory(
+        taskId: String,
+        total: Int,
+        succeededNumbers: Set<String>,
+    ) {
+        val current = mutableState.value
+        val targetRepository = repository ?: return
+        val table = current.table ?: return
+        val raw = current.rawTable ?: return
+        val now = System.currentTimeMillis()
+        val simLabel = current.simOptions.firstOrNull {
+            it.subscriptionId == current.selectedSubscriptionId
+        }?.displayLabel.orEmpty()
+        val history = SendHistoryEntity(
+            id = taskId,
+            createdAt = now,
+            completedAt = now,
+            simLabel = simLabel,
+            total = total,
+            succeeded = succeededNumbers.size,
+            failed = total - succeededNumbers.size,
+            headerNamesJson = JSONArray().apply {
+                table.columns.forEach { put(it.name) }
+            }.toString(),
+            firstRowIsHeader = table.firstRowIsHeader,
+            phoneColumnIndex = table.phoneColumnIndex,
+            backupPhoneColumnIndex = table.backupPhoneColumnIndex,
+            rawRowsJson = JSONArray().apply {
+                raw.rows.forEach { row ->
+                    put(JSONArray().apply { row.forEach(::put) })
+                }
+            }.toString(),
+            sentNumbersJson = JSONArray().apply {
+                succeededNumbers.forEach(::put)
+            }.toString(),
+        )
+        viewModelScope.launch { targetRepository.historyDao.insert(history) }
+    }
+
+    private fun removeSentNumbers(succeededNumbers: Set<String>) {
+        val current = mutableState.value
+        val raw = current.rawTable ?: return
+        val table = current.table ?: return
+        val phoneIndexes = listOfNotNull(table.phoneColumnIndex, table.backupPhoneColumnIndex)
+        if (phoneIndexes.isEmpty()) return
+        val updatedRows = raw.rows.mapNotNull { row ->
+            val cells = row.toMutableList()
+            var hadAnyNumber = false
+            var hasRemainingNumber = false
+            for (index in phoneIndexes) {
+                val cell = cells.getOrNull(index).orEmpty()
+                if (cell.isBlank()) continue
+                val numbers = PhoneNumberChecker.extractMobileNumbers(cell)
+                if (numbers.isEmpty()) continue
+                hadAnyNumber = true
+                val remaining = numbers.filterNot { it in succeededNumbers }
+                hasRemainingNumber = hasRemainingNumber || remaining.isNotEmpty()
+                cells[index] = remaining.joinToString(";")
+            }
+            // A row that had numbers but no longer has any is fully sent: drop it.
+            if (hadAnyNumber && !hasRemainingNumber) null else cells
+        }
+        rematerializeCurrent(raw.copy(rows = updatedRows), table.phoneColumnIndex, table.backupPhoneColumnIndex)
     }
 
     fun setSendPermissionDenied() = updateState {

@@ -12,6 +12,9 @@ enum class PhoneAvailability { AVAILABLE, INVALID, EMPTY }
 /** Carrier for a mainland-China mobile number, used for the availability summary. */
 enum class Carrier { CHINA_MOBILE, CHINA_UNICOM, CHINA_TELECOM, CHINA_BROADNET, UNKNOWN }
 
+/** A found mobile number and its location inside the original text. */
+data class NumberSpan(val start: Int, val end: Int, val number: String)
+
 /**
  * Validates phone numbers using the mobile number segments used by the Chinese
  * carriers (the "SIM providers"). A number is considered available when it matches
@@ -59,6 +62,18 @@ object PhoneNumberChecker {
             if (carrierOf(digits) != Carrier.UNKNOWN) result += digits
         }
         return result.toList()
+    }
+
+    /** Returns the extracted numbers together with their span in the original text. */
+    fun mobileNumberSpans(value: String): List<NumberSpan> {
+        val result = mutableListOf<NumberSpan>()
+        val seen = mutableSetOf<String>()
+        for (match in MOBILE_EXTRACT_PATTERN.findAll(value)) {
+            val digits = match.value
+            if (carrierOf(digits) == Carrier.UNKNOWN || !seen.add(digits)) continue
+            result += NumberSpan(start = match.range.first, end = match.range.last + 1, number = digits)
+        }
+        return result
     }
 
     fun carrierOf(value: String): Carrier {

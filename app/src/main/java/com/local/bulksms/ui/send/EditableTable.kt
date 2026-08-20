@@ -15,7 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
@@ -34,14 +34,17 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.local.bulksms.importdata.PhoneAvailability
 import com.local.bulksms.importdata.PhoneNumberChecker
+import com.local.bulksms.model.DynamicRow
 import com.local.bulksms.model.ImportedTable
 import com.local.bulksms.ui.theme.availablePhoneColor
 import com.local.bulksms.ui.theme.emptyPhoneColor
@@ -61,6 +64,8 @@ fun EditableTable(
     onAddColumn: () -> Unit = {},
     onDeleteRowRequested: (Long) -> Unit = {},
     onDeleteColumnRequested: (Int) -> Unit = {},
+    showAvailable: Boolean = true,
+    showUnavailable: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     val horizontalScroll = rememberScrollState()
@@ -80,6 +85,9 @@ fun EditableTable(
     }
     val columnsWidth = columnWidths.fold(0.dp) { total, width -> total + width }
     val contentWidth = 36.dp + columnsWidth + 40.dp
+    val visibleRows = table.rows.filter { row ->
+        isRowVisible(row, table, showAvailable, showUnavailable)
+    }
 
     Box(
         modifier = modifier
@@ -124,10 +132,10 @@ fun EditableTable(
 
             // Data rows, vertically lazy so a 1000-row sheet only composes the visible rows.
             LazyColumn(modifier = Modifier.weight(1f)) {
-                itemsIndexed(table.rows, key = { _, row -> row.id }) { rowIndex, row ->
+                items(visibleRows, key = { it.id }) { row ->
                     Row {
                         AxisCell(
-                            text = (rowIndex + 1).toString(),
+                            text = (row.id + 1).toString(),
                             width = 36.dp,
                             background = headerColor,
                             modifier = Modifier
@@ -135,7 +143,7 @@ fun EditableTable(
                                     onClick = { },
                                     onLongClick = { onDeleteRowRequested(row.id) },
                                 )
-                                .testTag("row-label-$rowIndex"),
+                                .testTag("row-label-${row.id}"),
                         )
                         table.columns.indices.forEach { columnIndex ->
                             val value = row.cells.getOrNull(columnIndex).orEmpty()
@@ -167,9 +175,12 @@ fun EditableTable(
                                     textStyle = MaterialTheme.typography.bodySmall.copy(color = textColor),
                                 )
                             } else {
+                                val hidden = isPhoneColumn &&
+                                    cellHasHiddenNumbers(value, showAvailable, showUnavailable)
                                 Box(
                                     modifier = cellModifier
                                         .clickable { editingCell = row.id to columnIndex }
+                                        .then(if (hidden) Modifier.alpha(0.3f) else Modifier)
                                         .testTag("cell-${row.id}-$columnIndex"),
                                     contentAlignment = Alignment.TopStart,
                                 ) {
@@ -232,6 +243,49 @@ private fun phoneCellColor(availability: PhoneAvailability): Color = when (avail
     PhoneAvailability.AVAILABLE -> availablePhoneColor()
     PhoneAvailability.INVALID -> invalidPhoneColor()
     PhoneAvailability.EMPTY -> emptyPhoneColor()
+}
+
+/**
+ * Row visibility driven by the available/unavailable phone filters. A row without any
+ * phone content stays visible only when both filters are on.
+ */
+private fun isRowVisible(
+    row: DynamicRow,
+    table: ImportedTable,
+    showAvailable: Boolean,
+    showUnavailable: Boolean,
+): Boolean {
+    val indexes = listOfNotNull(table.phoneColumnIndex, table.backupPhoneColumnIndex)
+    val cells = indexes.mapNotNull { row.cells.getOrNull(it) }
+    if (cells.all(String::isBlank)) return showAvailable && showUnavailable
+
+    val hasAvailable = cells.any { cell ->
+        PhoneNumberChecker.extractMobileNumbers(cell).any {
+            PhoneNumberChecker.availability(it) == PhoneAvailability.AVAILABLE
+        }
+    }
+    val hasUnavailable = cells.any { cell ->
+        val numbers = PhoneNumberChecker.extractMobileNumbers(cell)
+        numbers.isEmpty() || numbers.any {
+            PhoneNumberChecker.availability(it) != PhoneAvailability.AVAILABLE
+        }
+    }
+    return (hasAvailable && showAvailable) || (hasUnavailable && showUnavailable)
+}
+
+/**
+ * True when the cell contains at least one number of a category that is currently
+ * hidden, so the whole cell can be faded out.
+ */
+private fun cellHasHiddenNumbers(
+    value: String,
+    showAvailable: Boolean,
+    showUnavailable: Boolean,
+): Boolean {
+    return PhoneNumberChecker.extractMobileNumbers(value).any { number ->
+        val isAvailable = PhoneNumberChecker.availability(number) == PhoneAvailability.AVAILABLE
+        (isAvailable && !showAvailable) || (!isAvailable && !showUnavailable)
+    }
 }
 
 @Composable

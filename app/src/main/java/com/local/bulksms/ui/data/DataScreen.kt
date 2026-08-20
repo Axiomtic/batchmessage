@@ -3,13 +3,19 @@ package com.local.bulksms.ui.data
 import android.content.ClipboardManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
@@ -27,6 +33,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -112,11 +119,35 @@ fun DataScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text("数据表格", style = MaterialTheme.typography.titleMedium)
-                Text(
-                    "${table.rows.size} 行 · ${table.columns.size} 列",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        "${table.rows.size} 行 · ${table.columns.size} 列",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    SquareToggleButton(
+                        active = state.showAvailable,
+                        activeColor = Color(0xFF2E7D32),
+                        contentDescription = "可用电话",
+                        testTag = "toggle-available",
+                        onClick = { callbacks.onShowAvailableChanged(!state.showAvailable) },
+                    )
+                    SquareToggleButton(
+                        active = state.showUnavailable,
+                        activeColor = Color(0xFFC62828),
+                        contentDescription = "不可用电话",
+                        testTag = "toggle-unavailable",
+                        onClick = { callbacks.onShowUnavailableChanged(!state.showUnavailable) },
+                    )
+                    SquareActionButton(
+                        contentDescription = "导出表格",
+                        testTag = "export-table",
+                        onClick = callbacks.onExportTable,
+                    )
+                }
             }
 
             Row(
@@ -155,6 +186,8 @@ fun DataScreen(
                 onAddRow = callbacks.onAddRow,
                 onAddColumn = callbacks.onAddColumn,
                 onColumnHeaderClicked = callbacks.onColumnHeaderClicked,
+                showAvailable = state.showAvailable,
+                showUnavailable = state.showUnavailable,
                 onDeleteRowRequested = { rowId ->
                     val ordinal = table.rows.indexOfFirst { it.id == rowId } + 1
                     deleteTarget = DeleteTarget.Row(rowId, ordinal)
@@ -259,5 +292,62 @@ private fun ImportCard(
             Text(label, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
             Text(hint, style = MaterialTheme.typography.labelSmall)
         }
+    }
+}
+
+/** Square, cornerless toggle button used for the available/unavailable phone filters. */
+@Composable
+private fun SquareToggleButton(
+    active: Boolean,
+    activeColor: Color,
+    contentDescription: String,
+    testTag: String,
+    onClick: () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .size(34.dp)
+            .background(
+                if (active) activeColor else MaterialTheme.colorScheme.surfaceContainerHighest,
+                shape = RoundedCornerShape(0.dp),
+            )
+            .border(
+                width = if (active) 0.dp else 1.5.dp,
+                color = if (active) activeColor else activeColor.copy(alpha = 0.55f),
+            )
+            .clickable(onClick = onClick)
+            .testTag(testTag),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            painter = painterResource(BulkSmsIcons.Phone),
+            contentDescription = contentDescription,
+            tint = if (active) Color.White else activeColor,
+            modifier = Modifier.size(18.dp),
+        )
+    }
+}
+
+/** Square, cornerless action button (e.g. export). */
+@Composable
+private fun SquareActionButton(
+    contentDescription: String,
+    testTag: String,
+    onClick: () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .size(34.dp)
+            .background(MaterialTheme.colorScheme.primary, shape = RoundedCornerShape(0.dp))
+            .clickable(onClick = onClick)
+            .testTag(testTag),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            painter = painterResource(BulkSmsIcons.File),
+            contentDescription = contentDescription,
+            tint = MaterialTheme.colorScheme.onPrimary,
+            modifier = Modifier.size(18.dp),
+        )
     }
 }

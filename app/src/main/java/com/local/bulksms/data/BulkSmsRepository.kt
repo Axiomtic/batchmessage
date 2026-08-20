@@ -1,6 +1,7 @@
 package com.local.bulksms.data
 
 import androidx.room.withTransaction
+import com.local.bulksms.importdata.PhoneAvailability
 import com.local.bulksms.importdata.PhoneNumberChecker
 import com.local.bulksms.model.MessageDraft
 import com.local.bulksms.model.SendAttemptResult
@@ -29,6 +30,9 @@ class BulkSmsRepository(
 
     val sendDao: SendDao
         get() = database.sendDao()
+
+    val historyDao: HistoryDao
+        get() = database.historyDao()
 
     suspend fun saveImport(task: ImportTaskEntity) {
         database.importDao().upsert(task)
@@ -85,6 +89,8 @@ class BulkSmsRepository(
         importId: String,
         simSubscriptionId: Int,
         selectedRowIds: Set<Long>,
+        showAvailable: Boolean = true,
+        showUnavailable: Boolean = true,
     ): String =
         database.withTransaction {
             require(selectedRowIds.isNotEmpty()) { "至少选择一条短信" }
@@ -108,14 +114,18 @@ class BulkSmsRepository(
                 numbers += PhoneNumberChecker.extractMobileNumbers(draft.phoneNumber)
                 numbers += PhoneNumberChecker.extractMobileNumbers(draft.backupPhoneNumber)
                 for (number in numbers) {
-                    items += SendItemEntity(
-                        id = idFactory(),
-                        taskId = taskId,
-                        ordinal = ordinal++,
-                        phoneNumber = number,
-                        body = draft.currentBody,
-                        status = SendStatus.PENDING,
-                    )
+                    val isAvailable =
+                        PhoneNumberChecker.availability(number) == PhoneAvailability.AVAILABLE
+                    if ((isAvailable && showAvailable) || (!isAvailable && showUnavailable)) {
+                        items += SendItemEntity(
+                            id = idFactory(),
+                            taskId = taskId,
+                            ordinal = ordinal++,
+                            phoneNumber = number,
+                            body = draft.currentBody,
+                            status = SendStatus.PENDING,
+                        )
+                    }
                 }
             }
             require(items.isNotEmpty()) { "选中的短信没有可用的电话号码" }
