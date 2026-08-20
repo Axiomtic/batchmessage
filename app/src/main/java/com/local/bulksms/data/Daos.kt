@@ -145,3 +145,15 @@ interface SendDao {
     @Query("UPDATE send_attempts SET status = 'UNCERTAIN', finishedAt = :finishedAt WHERE itemId IN (SELECT id FROM send_items WHERE taskId = :taskId) AND status = 'SUBMITTING'")
     suspend fun markInterruptedAttempts(taskId: String, finishedAt: Long): Int
 }
+
+@Dao
+interface HistoryDao {
+    @Query("SELECT * FROM send_history ORDER BY completedAt DESC, id")
+    fun observeAll(): Flow<List<SendHistoryEntity>>
+
+    @Query("SELECT * FROM send_history WHERE id = :id")
+    suspend fun byId(id: String): SendHistoryEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(history: SendHistoryEntity)
+}

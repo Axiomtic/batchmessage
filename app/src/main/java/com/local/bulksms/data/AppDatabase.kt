@@ -37,8 +37,9 @@ class AppTypeConverters {
         SendTaskEntity::class,
         SendItemEntity::class,
         SendAttemptEntity::class,
+        SendHistoryEntity::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = true,
 )
 @TypeConverters(AppTypeConverters::class)
@@ -52,6 +53,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun draftDao(): DraftDao
 
     abstract fun sendDao(): SendDao
+
+    abstract fun historyDao(): HistoryDao
 
     companion object {
         const val DATABASE_NAME = "bulk_sms.db"
@@ -91,10 +94,36 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `send_history` (
+                        `id` TEXT NOT NULL,
+                        `createdAt` INTEGER NOT NULL,
+                        `completedAt` INTEGER NOT NULL,
+                        `simLabel` TEXT NOT NULL,
+                        `total` INTEGER NOT NULL,
+                        `succeeded` INTEGER NOT NULL,
+                        `failed` INTEGER NOT NULL,
+                        `headerNamesJson` TEXT NOT NULL,
+                        `firstRowIsHeader` INTEGER NOT NULL,
+                        `phoneColumnIndex` INTEGER,
+                        `backupPhoneColumnIndex` INTEGER,
+                        `rawRowsJson` TEXT NOT NULL,
+                        `sentNumbersJson` TEXT NOT NULL,
+                        PRIMARY KEY(`id`)
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_send_history_completedAt` ON `send_history` (`completedAt`)")
+            }
+        }
+
         fun create(context: Context): AppDatabase = Room.databaseBuilder(
             context.applicationContext,
             AppDatabase::class.java,
             DATABASE_NAME,
-        ).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build()
+        ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).build()
     }
 }

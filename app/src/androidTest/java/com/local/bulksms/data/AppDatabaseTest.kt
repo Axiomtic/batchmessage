@@ -131,6 +131,25 @@ class AppDatabaseTest {
     }
 
     @Test
+    fun migrationFromVersionThreeAddsSendHistoryTable() {
+        migrationHelper.createDatabase("migration-3", 3).apply {
+            close()
+        }
+
+        migrationHelper.runMigrationsAndValidate(
+            "migration-3",
+            4,
+            true,
+            AppDatabase.MIGRATION_3_4,
+        ).use { migrated ->
+            migrated.query("SELECT COUNT(*) FROM send_history").use { cursor ->
+                check(cursor.moveToFirst())
+                assertEquals(0, cursor.getInt(0))
+            }
+        }
+    }
+
+    @Test
     fun firstWorkspaceContainsSampleRowsAndDefaultTemplate() = runTest {
         val workspace = repository.loadOrCreateWorkspace()
 

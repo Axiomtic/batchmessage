@@ -208,4 +208,29 @@ data class SendAttemptEntity(
     val errorMessage: String? = null,
 )
 
+/**
+ * One completed batch-send task. Stores the table snapshot taken at send time plus
+ * the numbers that were successfully sent, so the history can be exported in the
+ * same shape as the data table (with only the sent numbers kept).
+ */
+@Entity(tableName = "send_history", indices = [Index("completedAt")])
+data class SendHistoryEntity(
+    @PrimaryKey val id: String,
+    val createdAt: Long,
+    val completedAt: Long,
+    val simLabel: String,
+    val total: Int,
+    val succeeded: Int,
+    val failed: Int,
+    /** Column names of the snapshot table, JSON array. */
+    val headerNamesJson: String,
+    val firstRowIsHeader: Boolean,
+    val phoneColumnIndex: Int?,
+    val backupPhoneColumnIndex: Int?,
+    /** Snapshot rows (raw text, numbers still in original cells), JSON array of arrays. */
+    val rawRowsJson: String,
+    /** Successfully sent numbers, JSON array. */
+    val sentNumbersJson: String,
+)
+
 internal fun newEntityId(): String = UUID.randomUUID().toString()
