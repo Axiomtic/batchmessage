@@ -44,7 +44,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.local.bulksms.importdata.PhoneAvailability
 import com.local.bulksms.importdata.PhoneNumberChecker
-import com.local.bulksms.model.DynamicRow
 import com.local.bulksms.model.ImportedTable
 import com.local.bulksms.ui.theme.availablePhoneColor
 import com.local.bulksms.ui.theme.emptyPhoneColor
@@ -85,17 +84,9 @@ fun EditableTable(
     }
     val columnsWidth = columnWidths.fold(0.dp) { total, width -> total + width }
     val contentWidth = 36.dp + columnsWidth + 40.dp
-    // With both filters on (the default) every row is visible, so skip the per-row
-    // phone-number scan entirely; this keeps typing in a large sheet smooth.
-    val visibleRows = remember(table, showAvailable, showUnavailable) {
-        if (showAvailable && showUnavailable) {
-            table.rows
-        } else {
-            table.rows.filter { row ->
-                isRowVisible(row, table, showAvailable, showUnavailable)
-            }
-        }
-    }
+    // All rows stay visible; hidden categories are expressed by fading the affected
+    // cells (semi-transparent), never by dropping rows.
+    val visibleRows = table.rows
 
     Box(
         modifier = modifier
@@ -254,45 +245,18 @@ private fun phoneCellColor(availability: PhoneAvailability): Color = when (avail
 }
 
 /**
- * Row visibility driven by the available/unavailable phone filters. A row without any
- * phone content stays visible only when both filters are on.
- */
-private fun isRowVisible(
-    row: DynamicRow,
-    table: ImportedTable,
-    showAvailable: Boolean,
-    showUnavailable: Boolean,
-): Boolean {
-    val indexes = listOfNotNull(table.phoneColumnIndex, table.backupPhoneColumnIndex)
-    val cells = indexes.mapNotNull { row.cells.getOrNull(it) }
-    if (cells.all(String::isBlank)) return showAvailable && showUnavailable
-
-    val hasAvailable = cells.any { cell ->
-        PhoneNumberChecker.extractMobileNumbers(cell).any {
-            PhoneNumberChecker.availability(it) == PhoneAvailability.AVAILABLE
-        }
-    }
-    val hasUnavailable = cells.any { cell ->
-        val numbers = PhoneNumberChecker.extractMobileNumbers(cell)
-        numbers.isEmpty() || numbers.any {
-            PhoneNumberChecker.availability(it) != PhoneAvailability.AVAILABLE
-        }
-    }
-    return (hasAvailable && showAvailable) || (hasUnavailable && showUnavailable)
-}
-
-/**
  * True when the cell contains at least one number of a category that is currently
- * hidden, so the whole cell can be faded out.
+ * hidden, so the whole cell can be faded out. Uses the same extraction and the same
+ * visibility rule as the preview and the send queue, so the table always agrees
+ * with what will be shown and sent.
  */
 private fun cellHasHiddenNumbers(
     value: String,
     showAvailable: Boolean,
     showUnavailable: Boolean,
 ): Boolean {
-    return PhoneNumberChecker.extractMobileNumbers(value).any { number ->
-        val isAvailable = PhoneNumberChecker.availability(number) == PhoneAvailability.AVAILABLE
-        (isAvailable && !showAvailable) || (!isAvailable && !showUnavailable)
+    return PhoneNumberChecker.extractPhoneNumbers(value).any { number ->
+        !PhoneNumberChecker.isVisible(number, showAvailable, showUnavailable)
     }
 }
 

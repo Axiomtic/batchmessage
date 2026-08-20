@@ -26,6 +26,16 @@ object PhoneNumberChecker {
     /** Matches an 11-digit mainland mobile number that is not part of a longer digit run. */
     private val MOBILE_EXTRACT_PATTERN = Regex("(?<!\\d)1[3-9]\\d{9}(?!\\d)")
 
+    /**
+     * Matches any phone-like fragment: a digit group (with optional dashes or
+     * parentheses between digit blocks, but not whitespace) whose digits alone are
+     * 5..20 long. Whitespace separates numbers, so "13800138000 010-12345678" yields
+     * two fragments. Used to surface "unavailable" numbers (landlines, malformed
+     * entries, foreign numbers) so the visibility filters can act on them too, not
+     * only on valid mobiles.
+     */
+    private val PHONE_LIKE_PATTERN = Regex("(?<![0-9])[0-9][0-9\\-()]{3,19}[0-9](?![0-9])")
+
     private val CHINA_MOBILE_PREFIXES = setOf(
         "134", "135", "136", "137", "138", "139", "147", "148", "150", "151", "152",
         "157", "158", "159", "165", "172", "173", "174", "178", "182", "183", "184",
@@ -75,6 +85,35 @@ object PhoneNumberChecker {
         }
         return result
     }
+
+    /**
+     * Extracts every phone-like number from free-form text, valid or not: valid
+     * mobiles plus landlines / malformed / foreign numbers. This is the extraction
+     * used by the preview, the send queue and the table so that the visibility
+     * filters govern all three identically.
+     */
+    fun extractPhoneNumbers(value: String): List<String> {
+        val result = linkedSetOf<String>()
+        for (match in PHONE_LIKE_PATTERN.findAll(value)) {
+            val digits = match.value.filter(Char::isDigit)
+            if (digits.length < 5 || digits.length > 20) continue
+            result += digits
+        }
+        return result.toList()
+    }
+
+    /**
+     * The visibility rule shared by the table, the preview and the send queue:
+     * a number is shown/sent when its category (available / unavailable) is on.
+     */
+    fun isVisible(number: String, showAvailable: Boolean, showUnavailable: Boolean): Boolean {
+        val isAvailable = availability(number) == PhoneAvailability.AVAILABLE
+        return (isAvailable && showAvailable) || (!isAvailable && showUnavailable)
+    }
+
+    /** All numbers in [value] whose category is currently visible. */
+    fun visibleNumbers(value: String, showAvailable: Boolean, showUnavailable: Boolean): List<String> =
+        extractPhoneNumbers(value).filter { isVisible(it, showAvailable, showUnavailable) }
 
     fun carrierOf(value: String): Carrier {
         val normalized = normalize(value)

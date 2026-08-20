@@ -24,6 +24,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.local.bulksms.importdata.PhoneAvailability
 import com.local.bulksms.importdata.PhoneNumberChecker
 import com.local.bulksms.model.MessageDraft
 import com.local.bulksms.ui.icons.BulkSmsIcons
@@ -47,12 +48,16 @@ fun MessageReviewScreen(
             selectedRowIds = state.selectedDraftRowIds,
             enabled = enabled,
             onSelectAll = onSelectAll,
+            showAvailable = state.showAvailable,
+            showUnavailable = state.showUnavailable,
         )
         MessageReviewList(
             drafts = state.drafts,
             selectedRowIds = state.selectedDraftRowIds,
             enabled = enabled,
             onSelectionChanged = onSelectionChanged,
+            showAvailable = state.showAvailable,
+            showUnavailable = state.showUnavailable,
             modifier = Modifier.weight(1f),
         )
     }
@@ -66,6 +71,8 @@ fun MessageReviewHeader(
     onSelectAll: (Boolean) -> Unit,
     draftsStale: Boolean = false,
     onRefresh: () -> Unit = {},
+    showAvailable: Boolean = true,
+    showUnavailable: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     val draftIds = drafts.mapTo(mutableSetOf()) { it.rowId }
@@ -75,7 +82,7 @@ fun MessageReviewHeader(
         selectedCount == drafts.size -> ToggleableState.On
         else -> ToggleableState.Indeterminate
     }
-    val stats = draftPhoneStats(drafts)
+    val stats = draftPhoneStats(drafts, showAvailable, showUnavailable)
     Row(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -147,6 +154,8 @@ fun MessageReviewList(
     selectedRowIds: Set<Long>,
     enabled: Boolean,
     onSelectionChanged: (rowId: Long, selected: Boolean) -> Unit,
+    showAvailable: Boolean = true,
+    showUnavailable: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
@@ -160,6 +169,8 @@ fun MessageReviewList(
                 selected = draft.rowId in selectedRowIds,
                 enabled = enabled,
                 onSelectionChanged = { selected -> onSelectionChanged(draft.rowId, selected) },
+                showAvailable = showAvailable,
+                showUnavailable = showUnavailable,
             )
         }
     }
@@ -172,6 +183,8 @@ private fun MessageReviewItem(
     selected: Boolean,
     enabled: Boolean,
     onSelectionChanged: (Boolean) -> Unit,
+    showAvailable: Boolean = true,
+    showUnavailable: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     Surface(
@@ -189,23 +202,43 @@ private fun MessageReviewItem(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(5.dp),
             ) {
-                val primaryNumbers = PhoneNumberChecker.extractMobileNumbers(draft.phoneNumber)
-                val backupNumbers = PhoneNumberChecker.extractMobileNumbers(draft.backupPhoneNumber)
+                val rawPrimary = PhoneNumberChecker.extractPhoneNumbers(draft.phoneNumber)
+                val primaryNumbers = rawPrimary.filter {
+                    PhoneNumberChecker.isVisible(it, showAvailable, showUnavailable)
+                }
+                val rawBackup = PhoneNumberChecker.extractPhoneNumbers(draft.backupPhoneNumber)
+                val backupNumbers = rawBackup.filter {
+                    PhoneNumberChecker.isVisible(it, showAvailable, showUnavailable)
+                }
+                val primaryLabel = when {
+                    primaryNumbers.isNotEmpty() -> primaryNumbers.joinToString("、")
+                    rawPrimary.isNotEmpty() -> "已隐藏"
+                    else -> "未设置"
+                }
+                val primaryColor = when {
+                    primaryNumbers.isNotEmpty() -> availablePhoneColor()
+                    rawPrimary.isNotEmpty() -> availablePhoneColor().copy(alpha = 0.45f)
+                    else -> emptyPhoneColor()
+                }
                 Text(
-                    if (primaryNumbers.isEmpty()) {
-                        "$ordinal · 主:未设置"
-                    } else {
-                        "$ordinal · 主:${primaryNumbers.joinToString("、")}"
-                    },
+                    "$ordinal · 主:$primaryLabel",
                     style = MaterialTheme.typography.labelMedium,
-                    color = if (primaryNumbers.isEmpty()) emptyPhoneColor() else availablePhoneColor(),
+                    color = primaryColor,
                     fontWeight = FontWeight.SemiBold,
                 )
-                if (backupNumbers.isNotEmpty()) {
+                if (backupNumbers.isNotEmpty() || rawBackup.isNotEmpty()) {
                     Text(
-                        "备:${backupNumbers.joinToString("、")}",
+                        if (backupNumbers.isNotEmpty()) {
+                            "备:${backupNumbers.joinToString("、")}"
+                        } else {
+                            "备:已隐藏"
+                        },
                         style = MaterialTheme.typography.labelMedium,
-                        color = availablePhoneColor(),
+                        color = if (backupNumbers.isNotEmpty()) {
+                            availablePhoneColor()
+                        } else {
+                            availablePhoneColor().copy(alpha = 0.45f)
+                        },
                     )
                 }
                 Text(draft.currentBody, style = MaterialTheme.typography.bodyMedium)
@@ -224,18 +257,27 @@ private data class DraftPhoneStats(val available: Int, val invalid: Int, val emp
     val total: Int get() = available + invalid + empty
 }
 
-private fun draftPhoneStats(drafts: List<MessageDraft>): DraftPhoneStats {
+private fun draftPhoneStats(
+    drafts: List<MessageDraft>,
+    showAvailable: Boolean,
+    showUnavailable: Boolean,
+): DraftPhoneStats {
     var available = 0
     var invalid = 0
     var empty = 0
     for (draft in drafts) {
         val cells = listOf(draft.phoneNumber, draft.backupPhoneNumber)
-        val numbers = cells.flatMap(PhoneNumberChecker::extractMobileNumbers)
-        when {
-            numbers.isNotEmpty() -> available += numbers.size
-            cells.all(String::isBlank) -> empty++
-            else -> invalid++
+        val numbers = cells.flatMap {
+            PhoneNumberChecker.visibleNumbers(it, showAvailable, showUnavailable)
         }
+        for (number in numbers) {
+            if (PhoneNumberChecker.availability(number) == PhoneAvailability.AVAILABLE) {
+                available++
+            } else {
+                invalid++
+            }
+        }
+        if (numbers.isEmpty() && cells.all(String::isBlank)) empty++
     }
     return DraftPhoneStats(available, invalid, empty)
 }

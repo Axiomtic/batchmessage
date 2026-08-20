@@ -111,12 +111,10 @@ class BulkSmsRepository(
             val items = mutableListOf<SendItemEntity>()
             for (draft in drafts) {
                 val numbers = linkedSetOf<String>()
-                numbers += PhoneNumberChecker.extractMobileNumbers(draft.phoneNumber)
-                numbers += PhoneNumberChecker.extractMobileNumbers(draft.backupPhoneNumber)
+                numbers += PhoneNumberChecker.extractPhoneNumbers(draft.phoneNumber)
+                numbers += PhoneNumberChecker.extractPhoneNumbers(draft.backupPhoneNumber)
                 for (number in numbers) {
-                    val isAvailable =
-                        PhoneNumberChecker.availability(number) == PhoneAvailability.AVAILABLE
-                    if ((isAvailable && showAvailable) || (!isAvailable && showUnavailable)) {
+                    if (PhoneNumberChecker.isVisible(number, showAvailable, showUnavailable)) {
                         items += SendItemEntity(
                             id = idFactory(),
                             taskId = taskId,

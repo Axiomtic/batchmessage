@@ -8,7 +8,6 @@ import com.local.bulksms.data.SendItemEntity
 import com.local.bulksms.data.TemplateEntity
 import com.local.bulksms.importdata.ExcelImporter
 import com.local.bulksms.importdata.HeaderDetector
-import com.local.bulksms.importdata.PhoneAvailability
 import com.local.bulksms.importdata.PhoneColumnDetector
 import com.local.bulksms.importdata.PhoneNumberChecker
 import com.local.bulksms.importdata.TabularTextParser
@@ -313,11 +312,11 @@ class SendFlowViewModel(
     }
 
     fun setShowAvailable(show: Boolean) = updateState {
-        it.copy(showAvailable = show, draftsStale = true)
+        it.copy(showAvailable = show)
     }
 
     fun setShowUnavailable(show: Boolean) = updateState {
-        it.copy(showUnavailable = show, draftsStale = true)
+        it.copy(showUnavailable = show)
     }
 
     suspend fun createSelectedSendTask(): String? {
@@ -446,7 +445,7 @@ class SendFlowViewModel(
             for (index in phoneIndexes) {
                 val cell = cells.getOrNull(index).orEmpty()
                 if (cell.isBlank()) continue
-                val numbers = PhoneNumberChecker.extractMobileNumbers(cell)
+                val numbers = PhoneNumberChecker.extractPhoneNumbers(cell)
                 if (numbers.isEmpty()) continue
                 hadAnyNumber = true
                 val remaining = numbers.filterNot { it in succeededNumbers }
@@ -582,7 +581,6 @@ class SendFlowViewModel(
                         draft.rowId != rowId -> draft
                         !synced -> draft.copy(syncWithTable = false)
                         else -> DraftSynchronizer.setSynced(draft, true, requireNotNull(row), template)
-                            .withVisibleNumbers(current.showAvailable, current.showUnavailable)
                     }
                 },
                 blockingError = null,
@@ -605,7 +603,6 @@ class SendFlowViewModel(
                 drafts = current.drafts.map { draft ->
                     rows[draft.rowId]?.let { row ->
                         DraftSynchronizer.setSynced(draft, true, row, template)
-                            .withVisibleNumbers(current.showAvailable, current.showUnavailable)
                     } ?: draft.copy(syncWithTable = false)
                 },
                 blockingError = if (detached) "没有对应表格行的独立短信保持不同步" else null,
@@ -838,33 +835,11 @@ class SendFlowViewModel(
         val rowIds = rowsWithData.mapTo(mutableSetOf()) { it.id }
         val existing = current.drafts.associateBy { it.rowId }
         val refreshed = rowsWithData.map { row ->
-            val draft = existing[row.id]?.let { DraftSynchronizer.regenerate(it, row, template, renderer) }
+            existing[row.id]?.let { draft -> DraftSynchronizer.regenerate(draft, row, template, renderer) }
                 ?: renderer.renderDraft(row, template)
-            draft.withVisibleNumbers(current.showAvailable, current.showUnavailable)
         }
-        val detached = current.drafts
-            .filter { !it.syncWithTable && it.rowId !in rowIds }
-            .map { it.withVisibleNumbers(current.showAvailable, current.showUnavailable) }
+        val detached = current.drafts.filter { !it.syncWithTable && it.rowId !in rowIds }
         return refreshed + detached
-    }
-
-    /**
-     * The preview (and therefore what gets sent) must reflect the visibility toggles:
-     * numbers of a hidden category are stripped from the draft, so the preview shows
-     * exactly the numbers that will be sent.
-     */
-    private fun MessageDraft.withVisibleNumbers(showAvailable: Boolean, showUnavailable: Boolean): MessageDraft {
-        fun visible(text: String): String {
-            val numbers = PhoneNumberChecker.extractMobileNumbers(text)
-            return numbers.filter { number ->
-                val isAvailable = PhoneNumberChecker.availability(number) == PhoneAvailability.AVAILABLE
-                (isAvailable && showAvailable) || (!isAvailable && showUnavailable)
-            }.joinToString(";")
-        }
-        return copy(
-            phoneNumber = visible(phoneNumber),
-            backupPhoneNumber = visible(backupPhoneNumber),
-        )
     }
 
     private fun templateMissing(table: ImportedTable): Set<String> {

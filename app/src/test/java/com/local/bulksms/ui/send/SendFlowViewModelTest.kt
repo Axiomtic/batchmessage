@@ -3,6 +3,7 @@ package com.local.bulksms.ui.send
 import com.local.bulksms.importdata.PhoneNumberChecker
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -318,26 +319,22 @@ class SendFlowViewModelTest {
     }
 
     @Test
-    fun hidingAvailableNumbersRemovesThemFromRefreshedPreview() {
+    fun visibilityTogglesDoNotStripNumbersFromDrafts() {
         val viewModel = SendFlowViewModel()
         // The default workspace has 13800138000 (available) in the 电话 column.
         viewModel.setShowAvailable(false)
+        viewModel.setShowUnavailable(false)
 
-        assertTrue(viewModel.state.value.draftsStale)
-        viewModel.refreshPreview()
-
+        // Drafts keep the full cell text; the visibility rule is applied at preview
+        // and send time so both always agree.
         val state = viewModel.state.value
-        assertTrue(
-            state.drafts.all { draft ->
-                PhoneNumberChecker.extractMobileNumbers(draft.phoneNumber)
-                    .none { it == "13800138000" }
-            },
-        )
-        assertTrue(state.drafts.all { it.phoneNumber.isBlank() })
+        assertFalse(state.draftsStale)
+        assertTrue(state.drafts.any { it.phoneNumber.contains("13800138000") })
+        assertTrue(state.drafts.any { it.phoneNumber.contains("13900139000") })
     }
 
     @Test
-    fun hidingUnavailableNumbersKeepsOnlyAvailableNumbersInPreview() {
+    fun visibilityRuleHidesUnavailableNumbersWhenToggleIsOff() {
         val viewModel = SendFlowViewModel()
         viewModel.importClipboard("电话\n13800138000")
         viewModel.selectPhoneColumn(0)
@@ -347,9 +344,12 @@ class SendFlowViewModelTest {
         viewModel.refreshPreview()
 
         val state = viewModel.state.value
-        assertEquals(listOf("13800138000"), state.drafts.flatMap {
-            PhoneNumberChecker.extractMobileNumbers(it.phoneNumber)
-        })
+        assertEquals(
+            listOf("13800138000"),
+            state.drafts.flatMap {
+                PhoneNumberChecker.visibleNumbers(it.phoneNumber, true, false)
+            },
+        )
     }
 
     @Test

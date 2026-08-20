@@ -75,8 +75,12 @@ fun SmsScreen(
     val pendingMessageCount = state.drafts
         .filter { it.rowId in state.selectedDraftRowIds }
         .sumOf { draft ->
-            PhoneNumberChecker.extractMobileNumbers(draft.phoneNumber).size +
-                PhoneNumberChecker.extractMobileNumbers(draft.backupPhoneNumber).size
+            PhoneNumberChecker.visibleNumbers(
+                draft.phoneNumber, state.showAvailable, state.showUnavailable,
+            ).size +
+                PhoneNumberChecker.visibleNumbers(
+                    draft.backupPhoneNumber, state.showAvailable, state.showUnavailable,
+                ).size
         }
 
     Column(
@@ -228,12 +232,16 @@ fun SmsScreen(
                     onSelectAll = callbacks.onSelectAllDrafts,
                     draftsStale = state.draftsStale,
                     onRefresh = callbacks.onRefreshPreview,
+                    showAvailable = state.showAvailable,
+                    showUnavailable = state.showUnavailable,
                 )
                 MessageReviewList(
                     drafts = state.drafts,
                     selectedRowIds = state.selectedDraftRowIds,
                     enabled = controlsEnabled,
                     onSelectionChanged = callbacks.onDraftSelectionChanged,
+                    showAvailable = state.showAvailable,
+                    showUnavailable = state.showUnavailable,
                     modifier = Modifier.weight(1f),
                 )
             }

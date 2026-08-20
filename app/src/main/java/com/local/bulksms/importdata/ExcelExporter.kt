@@ -34,7 +34,7 @@ object ExcelExporter {
                 var hasSentNumber = false
                 for (index in phoneIndexes) {
                     val cell = cells.getOrNull(index).orEmpty()
-                    val numbers = PhoneNumberChecker.extractMobileNumbers(cell)
+                    val numbers = PhoneNumberChecker.extractPhoneNumbers(cell)
                     if (numbers.isEmpty()) continue
                     val sent = numbers.filter { it in sentNumbers }
                     if (sent.isNotEmpty()) hasSentNumber = true

@@ -1,6 +1,8 @@
 package com.local.bulksms.importdata
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class PhoneNumberCheckerTest {
@@ -73,5 +75,58 @@ class PhoneNumberCheckerTest {
             PhoneAvailability.AVAILABLE,
             PhoneNumberChecker.availability("18912128125（旧） 18912128115（新）"),
         )
+    }
+
+    @Test
+    fun extractsPhoneLikeNumbersIncludingUnavailableOnes() {
+        assertEquals(
+            listOf("18912128125", "18912128115"),
+            PhoneNumberChecker.extractPhoneNumbers("18912128125（旧） 18912128115（新）"),
+        )
+        // Landlines, malformed entries and foreign numbers are surfaced too so the
+        // unavailable filter can act on them.
+        assertEquals(
+            listOf("01012345678"),
+            PhoneNumberChecker.extractPhoneNumbers("010-12345678"),
+        )
+        assertEquals(
+            listOf("12345678901"),
+            PhoneNumberChecker.extractPhoneNumbers("12345678901"),
+        )
+        // A 12-digit run is one unavailable number, not a valid-mobile prefix.
+        assertEquals(
+            listOf("189121281251"),
+            PhoneNumberChecker.extractPhoneNumbers("189121281251"),
+        )
+        // Short non-phone digit runs are ignored.
+        assertEquals(emptyList<String>(), PhoneNumberChecker.extractPhoneNumbers("张三 12"))
+    }
+
+    @Test
+    fun visibilityRuleMatchesAvailabilityCategories() {
+        assertTrue(PhoneNumberChecker.isVisible("13800138000", true, false))
+        assertFalse(PhoneNumberChecker.isVisible("13800138000", false, true))
+        assertTrue(PhoneNumberChecker.isVisible("01012345678", false, true))
+        assertFalse(PhoneNumberChecker.isVisible("01012345678", true, false))
+        assertTrue(PhoneNumberChecker.isVisible("13800138000", true, true))
+        assertTrue(PhoneNumberChecker.isVisible("01012345678", true, true))
+    }
+
+    @Test
+    fun visibleNumbersFollowsTheToggles() {
+        val text = "13800138000 010-12345678"
+        assertEquals(
+            listOf("13800138000"),
+            PhoneNumberChecker.visibleNumbers(text, true, false),
+        )
+        assertEquals(
+            listOf("01012345678"),
+            PhoneNumberChecker.visibleNumbers(text, false, true),
+        )
+        assertEquals(
+            listOf("13800138000", "01012345678"),
+            PhoneNumberChecker.visibleNumbers(text, true, true),
+        )
+        assertEquals(emptyList<String>(), PhoneNumberChecker.visibleNumbers(text, false, false))
     }
 }
