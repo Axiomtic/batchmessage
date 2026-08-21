@@ -1,6 +1,9 @@
 package com.local.bulksms.ui.send
 
 import com.local.bulksms.importdata.PhoneNumberChecker
+import com.local.bulksms.model.FilterCombine
+import com.local.bulksms.model.FilterCondition
+import com.local.bulksms.model.FilterOperator
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -378,5 +381,55 @@ class SendFlowViewModelTest {
         assertTrue(state.draftsStale)
         // Row ids stay stable so the lazy table keeps its scroll position.
         assertEquals(originalRows?.map { it.id }, state.table?.rows?.map { it.id })
+    }
+
+    @Test
+    fun columnFilterRebuildsDraftsWithOnlyMatchingRows() {
+        val viewModel = SendFlowViewModel()
+        // Sample rows: 张三(2026-09-30), 李四(2026-10-15). Column 2 = 服务到期日期.
+        viewModel.setColumnFilter(
+            2,
+            listOf(FilterCondition(FilterOperator.GREATER, "2026-10-01")),
+            FilterCombine.AND,
+        )
+
+        val state = viewModel.state.value
+        assertEquals(1, state.drafts.size)
+        assertEquals(listOf("李四"), state.drafts.map { draft ->
+            state.table?.rows?.firstOrNull { it.id == draft.rowId }?.cells?.first()
+        })
+        assertTrue(state.columnFilters.any { it.columnIndex == 2 })
+    }
+
+    @Test
+    fun clearingColumnFilterRestoresAllDrafts() {
+        val viewModel = SendFlowViewModel()
+        viewModel.setColumnFilter(
+            2,
+            listOf(FilterCondition(FilterOperator.GREATER, "2026-10-01")),
+            FilterCombine.AND,
+        )
+        assertEquals(1, viewModel.state.value.drafts.size)
+
+        viewModel.clearColumnFilter(2)
+
+        val state = viewModel.state.value
+        assertTrue(state.columnFilters.none { it.columnIndex == 2 })
+        assertEquals(2, state.drafts.size)
+    }
+
+    @Test
+    fun columnFilterWithOrCombineKeepsEitherMatch() {
+        val viewModel = SendFlowViewModel()
+        viewModel.setColumnFilter(
+            0,
+            listOf(
+                FilterCondition(FilterOperator.EQUALS, "张三"),
+                FilterCondition(FilterOperator.EQUALS, "李四"),
+            ),
+            FilterCombine.OR,
+        )
+
+        assertEquals(2, viewModel.state.value.drafts.size)
     }
 }

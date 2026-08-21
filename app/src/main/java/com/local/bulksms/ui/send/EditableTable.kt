@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -39,12 +40,15 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.local.bulksms.importdata.FilterMatcher
 import com.local.bulksms.importdata.PhoneAvailability
 import com.local.bulksms.importdata.PhoneNumberChecker
+import com.local.bulksms.model.ColumnFilter
 import com.local.bulksms.model.ImportedTable
 import com.local.bulksms.ui.theme.availablePhoneColor
 import com.local.bulksms.ui.theme.emptyPhoneColor
@@ -77,12 +81,14 @@ fun EditableTable(
     onCellChanged: (CellEdit) -> Unit,
     onHeaderChanged: (HeaderEdit) -> Unit = {},
     onColumnHeaderClicked: (Int) -> Unit = {},
+    onFilterColumnClicked: (Int) -> Unit = {},
     onAddRow: () -> Unit = {},
     onAddColumn: () -> Unit = {},
     onDeleteRowRequested: (Long) -> Unit = {},
     onDeleteColumnRequested: (Int) -> Unit = {},
     showAvailable: Boolean = true,
     showUnavailable: Boolean = true,
+    columnFilters: List<ColumnFilter> = emptyList(),
     modifier: Modifier = Modifier,
 ) {
     val horizontalScroll = rememberScrollState()
@@ -137,10 +143,14 @@ fun EditableTable(
             PhoneTableState(cellInfo = cellInfo, visibleRowIds = visibleRowIds)
         }
     }
-    // Rows with no visible phone number at all are hidden, like a filter.
-    val visibleRows = phoneState.visibleRowIds?.let { ids ->
-        table.rows.filter { it.id in ids }
-    } ?: table.rows
+    // Rows with no visible phone number at all are hidden, like a filter; then the
+    // per-column string filters are applied on top (a row must satisfy every column).
+    val visibleRows = table.rows.filter { row ->
+        val phoneOk = phoneState.visibleRowIds?.let { ids -> row.id in ids } ?: true
+        phoneOk && columnFilters.all { filter ->
+            FilterMatcher.matches(row.cells.getOrNull(filter.columnIndex).orEmpty(), filter)
+        }
+    }
 
     val onSurface = MaterialTheme.colorScheme.onSurface
     val bodySmall = MaterialTheme.typography.bodySmall
@@ -166,18 +176,46 @@ fun EditableTable(
                         phoneColumnIndex = table.phoneColumnIndex,
                         backupPhoneColumnIndex = table.backupPhoneColumnIndex,
                     )
-                    AxisCell(
-                        text = column.name,
-                        width = columnWidths[index],
-                        background = background,
-                        textColor = textColor,
+                    val hasFilter = columnFilters.any { it.columnIndex == index && it.activeConditions.isNotEmpty() }
+                    // Column header: tapping the name cycles the phone-column role;
+                    // the funnel icon on the right opens the column filter dialog.
+                    Box(
                         modifier = Modifier
+                            .width(columnWidths[index])
+                            .height(38.dp)
+                            .background(background)
+                            .border(0.5.dp, MaterialTheme.colorScheme.outlineVariant)
                             .combinedClickable(
                                 onClick = { onColumnHeaderClicked(index) },
                                 onLongClick = { onDeleteColumnRequested(index) },
                             )
                             .testTag("column-label-${column.name}"),
-                    )
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text = column.name,
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = textColor,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f, fill = false),
+                            )
+                            Icon(
+                                painter = painterResource(com.local.bulksms.R.drawable.ic_filter),
+                                contentDescription = "筛选${column.name}",
+                                tint = if (hasFilter) MaterialTheme.colorScheme.primary else textColor.copy(alpha = 0.45f),
+                                modifier = Modifier
+                                    .size(14.dp)
+                                    .clickable { onFilterColumnClicked(index) }
+                                    .testTag("column-filter-$index"),
+                            )
+                        }
+                    }
                 }
                 EdgeAddButton(
                     contentDescription = "添加列",

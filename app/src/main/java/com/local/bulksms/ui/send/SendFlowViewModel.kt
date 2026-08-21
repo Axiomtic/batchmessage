@@ -8,11 +8,15 @@ import com.local.bulksms.data.SendItemEntity
 import com.local.bulksms.data.TemplateEntity
 import com.local.bulksms.importdata.ExcelImporter
 import com.local.bulksms.importdata.ExcelExporter
+import com.local.bulksms.importdata.FilterMatcher
 import com.local.bulksms.importdata.HeaderDetector
 import com.local.bulksms.importdata.PhoneColumnDetector
 import com.local.bulksms.importdata.PhoneNumberChecker
 import com.local.bulksms.importdata.TabularTextParser
 import com.local.bulksms.importdata.TableImporter
+import com.local.bulksms.model.ColumnFilter
+import com.local.bulksms.model.FilterCombine
+import com.local.bulksms.model.FilterCondition
 import com.local.bulksms.model.ImportedTable
 import com.local.bulksms.model.MessageDraft
 import com.local.bulksms.model.RawTable
@@ -77,6 +81,9 @@ data class SendFlowUiState(
     /** Visibility toggles: whether available / unavailable phone numbers are shown and sent. */
     val showAvailable: Boolean = true,
     val showUnavailable: Boolean = true,
+    /** Per-column filters; rows failing them are hidden from the table, the preview
+     *  and the send queue (only visible data is ever sent). */
+    val columnFilters: List<ColumnFilter> = emptyList(),
 )
 
 class SendFlowViewModel(
@@ -342,6 +349,31 @@ class SendFlowViewModel(
     fun setShowUnavailable(show: Boolean) = updateState {
         it.copy(showUnavailable = show)
     }
+
+    /** Replaces the filter for one column (empty conditions clears it). */
+    fun setColumnFilter(
+        columnIndex: Int,
+        conditions: List<FilterCondition>,
+        combine: FilterCombine,
+    ) {
+        val current = mutableState.value
+        val table = current.table ?: return
+        val active = conditions.filter { it.value.isNotBlank() }
+        val filters = current.columnFilters.filterNot { it.columnIndex == columnIndex } +
+            if (active.isEmpty()) {
+                emptyList()
+            } else {
+                listOf(ColumnFilter(columnIndex, active, combine))
+            }
+        // Column filters decide which rows are visible, so drafts must be rebuilt to
+        // keep the preview and the send queue aligned with the table.
+        val updated = current.copy(columnFilters = filters, draftsStale = false)
+        updateState {
+            updated.replaceDrafts(refreshDrafts(updated, table))
+        }
+    }
+
+    fun clearColumnFilter(columnIndex: Int) = setColumnFilter(columnIndex, emptyList(), FilterCombine.AND)
 
     suspend fun createSelectedSendTask(): String? {
         val current = mutableState.value
@@ -855,7 +887,9 @@ class SendFlowViewModel(
     private fun refreshDrafts(current: SendFlowUiState, table: ImportedTable): List<MessageDraft> {
         val template = current.selectedTemplateBody ?: return current.drafts
         val renderer = TemplateRenderer(table)
-        val rowsWithData = table.rows.filter { row -> row.cells.any { it.isNotBlank() } }
+        val rowsWithData = table.rows.filter { row ->
+            row.cells.any { it.isNotBlank() } && rowMatchesFilters(row, current.columnFilters)
+        }
         val rowIds = rowsWithData.mapTo(mutableSetOf()) { it.id }
         val existing = current.drafts.associateBy { it.rowId }
         val refreshed = rowsWithData.map { row ->
@@ -865,6 +899,13 @@ class SendFlowViewModel(
         val detached = current.drafts.filter { !it.syncWithTable && it.rowId !in rowIds }
         return refreshed + detached
     }
+
+    /** A row is kept when it satisfies every active column filter. */
+    private fun rowMatchesFilters(row: com.local.bulksms.model.DynamicRow, filters: List<ColumnFilter>): Boolean =
+        filters.all { filter ->
+            val cell = row.cells.getOrNull(filter.columnIndex).orEmpty()
+            FilterMatcher.matches(cell, filter)
+        }
 
     private fun templateMissing(table: ImportedTable): Set<String> {
         val template = mutableState.value.selectedTemplateBody ?: return emptySet()

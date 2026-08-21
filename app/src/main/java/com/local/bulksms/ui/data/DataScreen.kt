@@ -12,15 +12,18 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -39,6 +42,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.local.bulksms.importdata.PhoneAvailability
 import com.local.bulksms.importdata.PhoneNumberChecker
+import com.local.bulksms.model.ColumnFilter
+import com.local.bulksms.model.FilterCombine
+import com.local.bulksms.model.FilterCondition
+import com.local.bulksms.model.FilterOperator
 import com.local.bulksms.model.ImportedTable
 import com.local.bulksms.ui.BulkSmsCallbacks
 import com.local.bulksms.ui.components.RoundedIconAction
@@ -66,6 +73,7 @@ fun DataScreen(
 ) {
     val context = LocalContext.current
     var deleteTarget by remember { mutableStateOf<DeleteTarget?>(null) }
+    var filterColumn by remember { mutableStateOf<Int?>(null) }
     val scope = rememberCoroutineScope()
     val fileLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         // Parsing a large workbook blocks the UI thread; do it off the main thread.
@@ -180,8 +188,10 @@ fun DataScreen(
                     onAddRow = callbacks.onAddRow,
                     onAddColumn = callbacks.onAddColumn,
                     onColumnHeaderClicked = callbacks.onColumnHeaderClicked,
+                    onFilterColumnClicked = { index -> filterColumn = index },
                     showAvailable = state.showAvailable,
                     showUnavailable = state.showUnavailable,
+                    columnFilters = state.columnFilters,
                     onDeleteRowRequested = { rowId ->
                         val ordinal = table.rows.indexOfFirst { it.id == rowId } + 1
                         deleteTarget = DeleteTarget.Row(rowId, ordinal)
@@ -273,6 +283,25 @@ fun DataScreen(
             },
         )
     }
+
+    filterColumn?.let { columnIndex ->
+        val column = state.table?.columns?.getOrNull(columnIndex)
+        if (column != null) {
+            ColumnFilterDialog(
+                columnName = column.name,
+                currentFilter = state.columnFilters.firstOrNull { it.columnIndex == columnIndex },
+                onDismiss = { filterColumn = null },
+                onApply = { conditions, combine ->
+                    callbacks.onColumnFilterApply(columnIndex, conditions, combine)
+                    filterColumn = null
+                },
+                onClear = {
+                    callbacks.onColumnFilterClear(columnIndex)
+                    filterColumn = null
+                },
+            )
+        }
+    }
 }
 
 private data class PhoneStats(val available: Int, val invalid: Int, val empty: Int) {
@@ -357,4 +386,169 @@ private fun PhoneFilterRow(
         Checkbox(checked = checked, onCheckedChange = { onToggle() })
         Text(label, style = MaterialTheme.typography.bodyMedium)
     }
+}
+
+/**
+ * Modal dialog for filtering one column with up to two string conditions combined
+ * by AND/OR. Comparisons are string based with smart numeric relational operators.
+ */
+@Composable
+private fun ColumnFilterDialog(
+    columnName: String,
+    currentFilter: ColumnFilter?,
+    onDismiss: () -> Unit,
+    onApply: (List<FilterCondition>, FilterCombine) -> Unit,
+    onClear: () -> Unit,
+) {
+    val existing = currentFilter?.activeConditions.orEmpty()
+    var op1 by remember { mutableStateOf(existing.getOrNull(0)?.operator ?: FilterOperator.EQUALS) }
+    var value1 by remember { mutableStateOf(existing.getOrNull(0)?.value.orEmpty()) }
+    var combine by remember { mutableStateOf(currentFilter?.combine ?: FilterCombine.AND) }
+    var op2 by remember { mutableStateOf(existing.getOrNull(1)?.operator ?: FilterOperator.EQUALS) }
+    var value2 by remember { mutableStateOf(existing.getOrNull(1)?.value.orEmpty()) }
+    var op1MenuOpen by remember { mutableStateOf(false) }
+    var op2MenuOpen by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("筛选：$columnName") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                FilterConditionRow(
+                    label = "条件 1",
+                    operator = op1,
+                    value = value1,
+                    operatorMenuOpen = op1MenuOpen,
+                    onOperatorMenuOpenChange = { op1MenuOpen = it },
+                    onOperatorChange = { op1 = it },
+                    onValueChange = { value1 = it },
+                    testTagPrefix = "filter-cond1",
+                )
+                if (value1.isNotBlank()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        Text("组合方式", style = MaterialTheme.typography.bodyMedium)
+                        TextButton(
+                            onClick = { combine = FilterCombine.AND },
+                            modifier = Modifier.testTag("filter-combine-and"),
+                        ) { Text(if (combine == FilterCombine.AND) "● 与 (AND)" else "○ 与 (AND)") }
+                        TextButton(
+                            onClick = { combine = FilterCombine.OR },
+                            modifier = Modifier.testTag("filter-combine-or"),
+                        ) { Text(if (combine == FilterCombine.OR) "● 或 (OR)" else "○ 或 (OR)") }
+                    }
+                    FilterConditionRow(
+                        label = "条件 2",
+                        operator = op2,
+                        value = value2,
+                        operatorMenuOpen = op2MenuOpen,
+                        onOperatorMenuOpenChange = { op2MenuOpen = it },
+                        onOperatorChange = { op2 = it },
+                        onValueChange = { value2 = it },
+                        testTagPrefix = "filter-cond2",
+                    )
+                }
+                Text(
+                    "字符串比较：等于/不等于精确匹配；大于小于等按数值比较（10 > 9）。",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("取消") }
+        },
+        confirmButton = {
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                TextButton(
+                    onClick = onClear,
+                    modifier = Modifier.testTag("filter-clear"),
+                ) { Text("清除", color = MaterialTheme.colorScheme.error) }
+                Button(
+                    onClick = {
+                        val conditions = buildList {
+                            if (value1.isNotBlank()) add(FilterCondition(op1, value1.trim()))
+                            if (value2.isNotBlank()) add(FilterCondition(op2, value2.trim()))
+                        }
+                        onApply(conditions, combine)
+                    },
+                    modifier = Modifier.testTag("filter-apply"),
+                ) { Text("确定") }
+            }
+        },
+    )
+}
+
+@Composable
+private fun FilterConditionRow(
+    label: String,
+    operator: FilterOperator,
+    value: String,
+    operatorMenuOpen: Boolean,
+    onOperatorMenuOpenChange: (Boolean) -> Unit,
+    onOperatorChange: (FilterOperator) -> Unit,
+    onValueChange: (String) -> Unit,
+    testTagPrefix: String,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(label, style = MaterialTheme.typography.bodyMedium)
+        Box(modifier = Modifier.width(104.dp)) {
+            OutlinedTextField(
+                value = operator.label(),
+                onValueChange = {},
+                readOnly = true,
+                enabled = false,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("$testTagPrefix-operator"),
+                textStyle = MaterialTheme.typography.bodyMedium,
+            )
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .clickable { onOperatorMenuOpenChange(true) },
+            )
+            DropdownMenu(
+                expanded = operatorMenuOpen,
+                onDismissRequest = { onOperatorMenuOpenChange(false) },
+            ) {
+                FilterOperator.entries.forEach { op ->
+                    DropdownMenuItem(
+                        text = { Text(op.label()) },
+                        onClick = {
+                            onOperatorChange(op)
+                            onOperatorMenuOpenChange(false)
+                        },
+                        modifier = Modifier.testTag("$testTagPrefix-op-${op.name}"),
+                    )
+                }
+            }
+        }
+        OutlinedTextField(
+            value = value,
+            onValueChange = onValueChange,
+            modifier = Modifier
+                .weight(1f)
+                .testTag("$testTagPrefix-value"),
+            placeholder = { Text("输入内容") },
+            singleLine = true,
+            textStyle = MaterialTheme.typography.bodyMedium,
+        )
+    }
+}
+
+private fun FilterOperator.label(): String = when (this) {
+    FilterOperator.EQUALS -> "等于"
+    FilterOperator.NOT_EQUALS -> "不等于"
+    FilterOperator.GREATER -> "大于"
+    FilterOperator.LESS -> "小于"
+    FilterOperator.GREATER_OR_EQUAL -> "大于等于"
+    FilterOperator.LESS_OR_EQUAL -> "小于等于"
 }

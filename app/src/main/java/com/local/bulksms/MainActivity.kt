@@ -168,6 +168,8 @@ class MainActivity : ComponentActivity() {
                         onColumnHeaderClicked = sendFlowViewModel::onColumnHeaderClicked,
                         onShowAvailableChanged = sendFlowViewModel::setShowAvailable,
                         onShowUnavailableChanged = sendFlowViewModel::setShowUnavailable,
+                        onColumnFilterApply = sendFlowViewModel::setColumnFilter,
+                        onColumnFilterClear = sendFlowViewModel::clearColumnFilter,
                         onAddRow = sendFlowViewModel::addRow,
                         onAddColumn = sendFlowViewModel::addColumn,
                         onDeleteRow = sendFlowViewModel::deleteRow,

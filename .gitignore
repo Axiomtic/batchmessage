@@ -11,3 +11,6 @@ local.properties
 /*.xml
 # Gradle-generated daemon JVM toolchain configuration
 /gradle/gradle-daemon-jvm.properties
+
+# Local release signing config (keystore path + passwords)
+app/keystore.properties

@@ -22,6 +22,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.local.bulksms.data.SendHistoryEntity
+import com.local.bulksms.model.FilterCombine
+import com.local.bulksms.model.FilterCondition
 import com.local.bulksms.ui.data.DataScreen
 import com.local.bulksms.ui.history.HistoryScreen
 import com.local.bulksms.ui.send.SendFlowUiState
@@ -46,6 +48,9 @@ data class BulkSmsCallbacks(
     val onColumnHeaderClicked: (Int) -> Unit = {},
     val onShowAvailableChanged: (Boolean) -> Unit = {},
     val onShowUnavailableChanged: (Boolean) -> Unit = {},
+    val onColumnFilterApply: (Int, List<FilterCondition>, FilterCombine) -> Unit =
+        { _, _, _ -> },
+    val onColumnFilterClear: (Int) -> Unit = {},
     val onExportTable: () -> Unit = {},
     val onExportHistory: (SendHistoryEntity) -> Unit = {},
     val onOpenHistory: () -> Unit = {},
