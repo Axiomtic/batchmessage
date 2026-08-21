@@ -58,6 +58,10 @@ class MainActivity : ComponentActivity() {
                 var simPermissionRequested by remember { mutableStateOf(false) }
                 var showHistory by remember { mutableStateOf(false) }
                 var history by remember { mutableStateOf<List<SendHistoryEntity>>(emptyList()) }
+                // Guards the export/share callbacks so rapid taps do not queue up
+                // multiple workbook builds or share sheets.
+                var exportInFlight by remember { mutableStateOf(false) }
+                val historyExportCache = remember { mutableMapOf<String, ByteArray>() }
                 LaunchedEffect(app.repository) {
                     app.repository.historyDao.observeAll().collect { history = it }
                 }
@@ -222,22 +226,43 @@ class MainActivity : ComponentActivity() {
                         },
                         onOpenHistory = { showHistory = true },
                         onExportTable = {
-                            val state = sendState
-                            val table = state.table ?: return@BulkSmsCallbacks
-                            val bytes = ExcelExporter.exportTable(
-                                headerNames = table.columns.map { it.name },
-                                rows = table.rows.map { it.cells },
-                            )
-                            ExcelExporter.shareXlsx(this@MainActivity, "数据表.xlsx", bytes, "分享数据表")
+                            if (exportInFlight) return@BulkSmsCallbacks
+                            exportInFlight = true
+                            val context = this@MainActivity
+                            composeScope.launch {
+                                try {
+                                    // Off the main thread: reuse the cached bytes when
+                                    // the table hasn't changed, otherwise build once.
+                                    val bytes = sendFlowViewModel.exportTableBytes() ?: return@launch
+                                    ExcelExporter.shareXlsx(context, "数据表.xlsx", bytes, "分享数据表")
+                                } finally {
+                                    exportInFlight = false
+                                }
+                            }
                         },
                         onExportHistory = { entry ->
-                            val bytes = ExcelExporter.exportHistory(entry)
-                            ExcelExporter.shareXlsx(
-                                this@MainActivity,
-                                "历史记录-${entry.completedAt}.xlsx",
-                                bytes,
-                                "分享历史记录",
-                            )
+                            if (exportInFlight) return@BulkSmsCallbacks
+                            exportInFlight = true
+                            val context = this@MainActivity
+                            composeScope.launch {
+                                try {
+                                    // History entries are immutable, so cache the
+                                    // built workbook per entry after the first share.
+                                    val bytes = withContext(Dispatchers.IO) {
+                                        historyExportCache.getOrPut(entry.id) {
+                                            ExcelExporter.exportHistory(entry)
+                                        }
+                                    }
+                                    ExcelExporter.shareXlsx(
+                                        context,
+                                        "历史记录-${entry.completedAt}.xlsx",
+                                        bytes,
+                                        "分享历史记录",
+                                    )
+                                } finally {
+                                    exportInFlight = false
+                                }
+                            }
                         },
                     ),
                     externalDataNavigationRequest = externalDataNavigationRequest,

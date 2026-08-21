@@ -7,6 +7,7 @@ import com.local.bulksms.data.SendHistoryEntity
 import com.local.bulksms.data.SendItemEntity
 import com.local.bulksms.data.TemplateEntity
 import com.local.bulksms.importdata.ExcelImporter
+import com.local.bulksms.importdata.ExcelExporter
 import com.local.bulksms.importdata.HeaderDetector
 import com.local.bulksms.importdata.PhoneColumnDetector
 import com.local.bulksms.importdata.PhoneNumberChecker
@@ -24,12 +25,14 @@ import com.local.bulksms.template.DraftSynchronizer
 import com.local.bulksms.template.TemplateRenderer
 import java.io.InputStream
 import java.util.UUID
-import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 
 data class PendingImport(
@@ -84,10 +87,31 @@ class SendFlowViewModel(
 ) : ViewModel() {
     private val persistenceChannel = Channel<SendFlowUiState>(Channel.CONFLATED)
     private var sendProgressJob: Job? = null
+    /**
+     * Cached .xlsx bytes of the current table, so repeated shares skip the POI
+     * rebuild. Invalidated automatically whenever the table instance changes
+     * (see [updateState]); a fresh import also nulls it in [applyImportedRaw].
+     */
+    private var tableExportCache: ByteArray? = null
     private val mutableState = MutableStateFlow(
         stateFromWorkspace(initialWorkspace).copy(workspaceReady = repository == null),
     )
     val state: StateFlow<SendFlowUiState> = mutableState.asStateFlow()
+
+    /** Returns the current table exported to .xlsx, building it off the main
+     *  thread once and caching the bytes for later shares. */
+    suspend fun exportTableBytes(): ByteArray? {
+        tableExportCache?.let { return it }
+        val table = mutableState.value.table ?: return null
+        val bytes = withContext(Dispatchers.IO) {
+            ExcelExporter.exportTable(
+                headerNames = table.columns.map { it.name },
+                rows = table.rows.map { it.cells },
+            )
+        }
+        tableExportCache = bytes
+        return bytes
+    }
 
     init {
         val targetRepository = repository
@@ -857,7 +881,11 @@ class SendFlowViewModel(
     }
 
     private fun updateState(transform: (SendFlowUiState) -> SendFlowUiState) {
-        val updated = transform(mutableState.value)
+        val previous = mutableState.value
+        val updated = transform(previous)
+        // Any table change (cell edits, row/column ops, header toggle, import) means
+        // the cached .xlsx no longer matches; drop it so the next share rebuilds.
+        if (updated.table !== previous.table) tableExportCache = null
         mutableState.value = updated
         schedulePersistence(updated)
     }
