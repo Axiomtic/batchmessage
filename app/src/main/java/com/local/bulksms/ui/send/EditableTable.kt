@@ -60,6 +60,17 @@ private data class PhoneCellInfo(
     val hidden: Boolean,
 )
 
+/**
+ * Precomputed per-table phone facts: cell-level display info plus the set of rows
+ * that have at least one visible number. Rows without any visible phone number are
+ * filtered out of the table (a filter), while cells containing hidden numbers stay
+ * in the list but are faded.
+ */
+private data class PhoneTableState(
+    val cellInfo: Map<Pair<Long, Int>, PhoneCellInfo>,
+    val visibleRowIds: Set<Long>?,
+)
+
 @Composable
 fun EditableTable(
     table: ImportedTable,
@@ -87,35 +98,49 @@ fun EditableTable(
     }
     val columnsWidth = columnWidths.fold(0.dp) { total, width -> total + width }
     val contentWidth = 36.dp + columnsWidth + 40.dp
-    // All rows stay visible; hidden categories are expressed by fading the affected
-    // cells (semi-transparent), never by dropping rows.
-    val visibleRows = table.rows
 
-    // The phone-column cells are the only ones needing per-cell regex work
-    // (availability + hidden-number detection). Precompute it once per table so
-    // scrolling just looks up the map instead of running regexes for every visible
-    // cell every frame.
-    val phoneCellInfo = remember(table, showAvailable, showUnavailable) {
+    // Precompute the phone-column facts once per table so scrolling never runs
+    // regexes per visible cell: cell availability/hidden for fading, plus which
+    // rows keep at least one visible number (rows without any are filtered out).
+    val phoneState = remember(table, showAvailable, showUnavailable) {
         val phoneIndexes = listOfNotNull(table.phoneColumnIndex, table.backupPhoneColumnIndex)
         if (phoneIndexes.isEmpty()) {
-            emptyMap()
+            // No phone column selected: nothing to filter, nothing to fade.
+            PhoneTableState(cellInfo = emptyMap(), visibleRowIds = null)
         } else {
-            buildMap {
-                for (row in table.rows) {
-                    for (index in phoneIndexes) {
-                        val value = row.cells.getOrNull(index).orEmpty()
-                        put(
-                            row.id to index,
-                            PhoneCellInfo(
-                                availability = PhoneNumberChecker.availability(value),
-                                hidden = cellHasHiddenNumbers(value, showAvailable, showUnavailable),
-                            ),
-                        )
+            val cellInfo = mutableMapOf<Pair<Long, Int>, PhoneCellInfo>()
+            val visibleRowIds = mutableSetOf<Long>()
+            for (row in table.rows) {
+                var hasAnyNumber = false
+                var hasVisible = false
+                var hasHidden = false
+                for (index in phoneIndexes) {
+                    val value = row.cells.getOrNull(index).orEmpty()
+                    val numbers = PhoneNumberChecker.extractPhoneNumbers(value)
+                    if (numbers.isNotEmpty()) hasAnyNumber = true
+                    if (numbers.any { PhoneNumberChecker.isVisible(it, showAvailable, showUnavailable) }) {
+                        hasVisible = true
                     }
+                    if (numbers.any { !PhoneNumberChecker.isVisible(it, showAvailable, showUnavailable) }) {
+                        hasHidden = true
+                    }
+                    cellInfo[row.id to index] = PhoneCellInfo(
+                        availability = PhoneNumberChecker.availability(value),
+                        hidden = hasHidden,
+                    )
                 }
+                // Filtering hides rows whose numbers are ALL hidden. Rows without any
+                // number count as the empty/unavailable category and follow the
+                // unavailable toggle (visible by default, hidden when it is off).
+                if (hasVisible || (!hasAnyNumber && showUnavailable)) visibleRowIds += row.id
             }
+            PhoneTableState(cellInfo = cellInfo, visibleRowIds = visibleRowIds)
         }
     }
+    // Rows with no visible phone number at all are hidden, like a filter.
+    val visibleRows = phoneState.visibleRowIds?.let { ids ->
+        table.rows.filter { it.id in ids }
+    } ?: table.rows
 
     val onSurface = MaterialTheme.colorScheme.onSurface
     val bodySmall = MaterialTheme.typography.bodySmall
@@ -201,7 +226,7 @@ fun EditableTable(
                         )
                         table.columns.indices.forEach { columnIndex ->
                             val value = row.cells.getOrNull(columnIndex).orEmpty()
-                            val info = phoneCellInfo[row.id to columnIndex]
+                            val info = phoneState.cellInfo[row.id to columnIndex]
                             val textColor = if (info != null) {
                                 phoneCellColor(info.availability)
                             } else {
@@ -309,22 +334,6 @@ private fun phoneCellColor(availability: PhoneAvailability): Color = when (avail
     PhoneAvailability.AVAILABLE -> availablePhoneColor()
     PhoneAvailability.INVALID -> invalidPhoneColor()
     PhoneAvailability.EMPTY -> emptyPhoneColor()
-}
-
-/**
- * True when the cell contains at least one number of a category that is currently
- * hidden, so the whole cell can be faded out. Uses the same extraction and the same
- * visibility rule as the preview and the send queue, so the table always agrees
- * with what will be shown and sent.
- */
-private fun cellHasHiddenNumbers(
-    value: String,
-    showAvailable: Boolean,
-    showUnavailable: Boolean,
-): Boolean {
-    return PhoneNumberChecker.extractPhoneNumbers(value).any { number ->
-        !PhoneNumberChecker.isVisible(number, showAvailable, showUnavailable)
-    }
 }
 
 @Composable
