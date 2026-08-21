@@ -32,13 +32,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -53,6 +53,12 @@ import com.local.bulksms.ui.theme.invalidPhoneColor
 data class CellEdit(val rowId: Long, val columnIndex: Int, val value: String)
 
 data class HeaderEdit(val columnIndex: Int, val value: String)
+
+/** Precomputed display facts for one phone-column cell. */
+private data class PhoneCellInfo(
+    val availability: PhoneAvailability,
+    val hidden: Boolean,
+)
 
 @Composable
 fun EditableTable(
@@ -84,6 +90,35 @@ fun EditableTable(
     // All rows stay visible; hidden categories are expressed by fading the affected
     // cells (semi-transparent), never by dropping rows.
     val visibleRows = table.rows
+
+    // The phone-column cells are the only ones needing per-cell regex work
+    // (availability + hidden-number detection). Precompute it once per table so
+    // scrolling just looks up the map instead of running regexes for every visible
+    // cell every frame.
+    val phoneCellInfo = remember(table, showAvailable, showUnavailable) {
+        val phoneIndexes = listOfNotNull(table.phoneColumnIndex, table.backupPhoneColumnIndex)
+        if (phoneIndexes.isEmpty()) {
+            emptyMap()
+        } else {
+            buildMap {
+                for (row in table.rows) {
+                    for (index in phoneIndexes) {
+                        val value = row.cells.getOrNull(index).orEmpty()
+                        put(
+                            row.id to index,
+                            PhoneCellInfo(
+                                availability = PhoneNumberChecker.availability(value),
+                                hidden = cellHasHiddenNumbers(value, showAvailable, showUnavailable),
+                            ),
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    val onSurface = MaterialTheme.colorScheme.onSurface
+    val bodySmall = MaterialTheme.typography.bodySmall
 
     Box(
         modifier = modifier
@@ -129,7 +164,30 @@ fun EditableTable(
             // Data rows, vertically lazy so a 1000-row sheet only composes the visible rows.
             LazyColumn(modifier = Modifier.weight(1f)) {
                 items(visibleRows, key = { it.id }) { row ->
-                    Row {
+                    // One grid per row drawn once instead of a border modifier on
+                    // every cell: far fewer draw calls while scrolling.
+                    Row(
+                        modifier = Modifier.drawBehind {
+                            val lineWidth = 0.5.dp.toPx()
+                            val bottom = 38.dp.toPx()
+                            var x = 36.dp.toPx()
+                            for (width in columnWidths) {
+                                x += width.toPx()
+                                drawLine(
+                                    color = borderColor,
+                                    start = Offset(x, 0f),
+                                    end = Offset(x, bottom),
+                                    strokeWidth = lineWidth,
+                                )
+                            }
+                            drawLine(
+                                color = borderColor,
+                                start = Offset(0f, bottom),
+                                end = Offset(x + 40.dp.toPx(), bottom),
+                                strokeWidth = lineWidth,
+                            )
+                        },
+                    ) {
                         AxisCell(
                             text = (row.id + 1).toString(),
                             width = 36.dp,
@@ -143,17 +201,15 @@ fun EditableTable(
                         )
                         table.columns.indices.forEach { columnIndex ->
                             val value = row.cells.getOrNull(columnIndex).orEmpty()
-                            val isPhoneColumn = columnIndex == table.phoneColumnIndex ||
-                                columnIndex == table.backupPhoneColumnIndex
-                            val textColor = if (isPhoneColumn) {
-                                phoneCellColor(PhoneNumberChecker.availability(value))
+                            val info = phoneCellInfo[row.id to columnIndex]
+                            val textColor = if (info != null) {
+                                phoneCellColor(info.availability)
                             } else {
-                                MaterialTheme.colorScheme.onSurface
+                                onSurface
                             }
                             val cellModifier = Modifier
                                 .width(columnWidths[columnIndex])
                                 .height(38.dp)
-                                .border(0.5.dp, borderColor)
                                 .padding(horizontal = 8.dp, vertical = 9.dp)
                             if (editingCell == (row.id to columnIndex)) {
                                 val focusRequester = remember { FocusRequester() }
@@ -182,22 +238,22 @@ fun EditableTable(
                                         }
                                         .testTag("cell-${row.id}-$columnIndex"),
                                     singleLine = true,
-                                    textStyle = MaterialTheme.typography.bodySmall.copy(color = textColor),
+                                    textStyle = bodySmall.copy(color = textColor),
                                 )
                             } else {
-                                val hidden = isPhoneColumn && !(showAvailable && showUnavailable) &&
-                                    cellHasHiddenNumbers(value, showAvailable, showUnavailable)
+                                // Fade hidden numbers through the text color instead of
+                                // Modifier.alpha, which would force an offscreen layer.
+                                val hidden = info?.hidden == true
                                 Box(
                                     modifier = cellModifier
                                         .clickable { editingCell = row.id to columnIndex }
-                                        .then(if (hidden) Modifier.alpha(0.3f) else Modifier)
                                         .testTag("cell-${row.id}-$columnIndex"),
                                     contentAlignment = Alignment.TopStart,
                                 ) {
                                     Text(
                                         value,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = textColor,
+                                        style = bodySmall,
+                                        color = if (hidden) textColor.copy(alpha = 0.3f) else textColor,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
                                     )
