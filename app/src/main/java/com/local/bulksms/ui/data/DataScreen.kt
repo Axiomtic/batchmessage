@@ -3,7 +3,6 @@ package com.local.bulksms.ui.data
 import android.content.ClipboardManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,13 +12,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
@@ -33,7 +32,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -169,10 +167,12 @@ fun DataScreen(
                 )
             }
 
-            // The visibility filters float at the top-right of the table viewport so
-            // they stay reachable while scrolling; the share button lives in the
-            // block header above. Without a phone column there is nothing to filter.
+            // A single filter button (WPS-style) at the top-right of the table
+            // viewport opens a dropdown with checkbox options for which phone
+            // categories stay visible; the share button lives in the block header
+            // above. Without a phone column there is nothing to filter.
             val hasPhoneColumn = table.phoneColumnIndex != null || table.backupPhoneColumnIndex != null
+            var filterMenuOpen by remember { mutableStateOf(false) }
             Box(modifier = Modifier.weight(1f)) {
                 EditableTable(
                     table = table,
@@ -191,30 +191,46 @@ fun DataScreen(
                     },
                     modifier = Modifier.fillMaxSize(),
                 )
-                Row(
+                Box(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .padding(top = 44.dp, end = 6.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        .padding(top = 40.dp, end = 4.dp),
                 ) {
-                    VisibilityToggleButton(
-                        active = state.showAvailable,
+                    RoundedIconAction(
+                        iconRes = BulkSmsIcons.Filter,
+                        contentDescription = "筛选电话",
                         enabled = hasPhoneColumn,
-                        activeColor = Color(0xFF2E7D32),
-                        iconRes = BulkSmsIcons.Success,
-                        contentDescription = "可用电话",
-                        testTag = "toggle-available",
-                        onClick = { callbacks.onShowAvailableChanged(!state.showAvailable) },
+                        onClick = { filterMenuOpen = true },
+                        modifier = Modifier.testTag("filter-phone"),
                     )
-                    VisibilityToggleButton(
-                        active = state.showUnavailable,
-                        enabled = hasPhoneColumn,
-                        activeColor = Color(0xFFC62828),
-                        iconRes = BulkSmsIcons.Error,
-                        contentDescription = "不可用电话",
-                        testTag = "toggle-unavailable",
-                        onClick = { callbacks.onShowUnavailableChanged(!state.showUnavailable) },
-                    )
+                    DropdownMenu(
+                        expanded = filterMenuOpen,
+                        onDismissRequest = { filterMenuOpen = false },
+                    ) {
+                        PhoneFilterRow(
+                            label = "全选",
+                            checked = state.showAvailable && state.showUnavailable,
+                            testTag = "filter-select-all",
+                            onToggle = {
+                                val all = state.showAvailable && state.showUnavailable
+                                callbacks.onShowAvailableChanged(!all)
+                                callbacks.onShowUnavailableChanged(!all)
+                            },
+                        )
+                        HorizontalDivider()
+                        PhoneFilterRow(
+                            label = "可用电话",
+                            checked = state.showAvailable,
+                            testTag = "toggle-available",
+                            onToggle = { callbacks.onShowAvailableChanged(!state.showAvailable) },
+                        )
+                        PhoneFilterRow(
+                            label = "不可用电话",
+                            checked = state.showUnavailable,
+                            testTag = "toggle-unavailable",
+                            onToggle = { callbacks.onShowUnavailableChanged(!state.showUnavailable) },
+                        )
+                    }
                 }
             }
         }
@@ -322,41 +338,23 @@ private fun ImportCard(
     }
 }
 
-/**
- * Visibility filter toggle pinned to the table viewport's top-right corner.
- * Borderless with a solid background in a 2:1 (width:height) shape; a check icon
- * marks the available filter and a warning triangle the unavailable one. The
- * opacity drops when the filter is off, and further when no phone column exists.
- */
+/** One checkbox row inside the WPS-style phone filter dropdown. */
 @Composable
-private fun VisibilityToggleButton(
-    active: Boolean,
-    enabled: Boolean,
-    activeColor: Color,
-    iconRes: Int,
-    contentDescription: String,
+private fun PhoneFilterRow(
+    label: String,
+    checked: Boolean,
     testTag: String,
-    onClick: () -> Unit,
+    onToggle: () -> Unit,
 ) {
-    val backgroundAlpha = when {
-        !enabled -> 0.15f
-        active -> 1f
-        else -> 0.38f
-    }
-    Box(
+    Row(
         modifier = Modifier
-            .width(56.dp)
-            .height(28.dp)
-            .background(activeColor.copy(alpha = backgroundAlpha), shape = RoundedCornerShape(0.dp))
-            .clickable(enabled = enabled, onClick = onClick)
+            .fillMaxWidth()
+            .clickable(onClick = onToggle)
+            .padding(horizontal = 14.dp, vertical = 4.dp)
             .testTag(testTag),
-        contentAlignment = Alignment.Center,
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(
-            painter = painterResource(iconRes),
-            contentDescription = contentDescription,
-            tint = Color.White.copy(alpha = if (active) 1f else 0.85f),
-            modifier = Modifier.size(16.dp),
-        )
+        Checkbox(checked = checked, onCheckedChange = { onToggle() })
+        Text(label, style = MaterialTheme.typography.bodyMedium)
     }
 }
